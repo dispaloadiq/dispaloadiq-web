@@ -1,0 +1,35 @@
+// DispaLoadIQ — единая палитра (синхронизировано с мобильным приложением)
+export const Colors = {
+  primary:      '#4BAED4',
+  primaryDark:  '#2D7A9A',
+  primaryLight: '#E8F4FD',
+  background:   '#F4F6F9',
+  surface:      '#FFFFFF',
+  textPrimary:  '#2D3748',
+  textSecondary:'#718096',
+  textLight:    '#A0AEC0',
+  textWhite:    '#FFFFFF',
+  success:      '#38C770',
+  warning:      '#F6C90E',
+  error:        '#E53E3E',
+  border:       '#E2E8F0',
+  divider:      '#F0F4F8',
+  dark:         '#1A2535',
+  darkCard:     '#243048',
+};
+
+export const CSS = {
+  '--c-primary':       Colors.primary,
+  '--c-primary-dark':  Colors.primaryDark,
+  '--c-primary-light': Colors.primaryLight,
+  '--c-bg':            Colors.background,
+  '--c-surface':       Colors.surface,
+  '--c-text':          Colors.textPrimary,
+  '--c-text-sec':      Colors.textSecondary,
+  '--c-text-light':    Colors.textLight,
+  '--c-success':       Colors.success,
+  '--c-warning':       Colors.warning,
+  '--c-error':         Colors.error,
+  '--c-border':        Colors.border,
+  '--c-dark':          Colors.dark,
+};
