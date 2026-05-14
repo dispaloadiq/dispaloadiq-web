@@ -106,7 +106,16 @@ export default function AuthPage({ onLogin }: Props) {
       const { error: err } = await signIn(email, password)
       setSubmitting(false)
       if (err) {
-        setError(err.message || 'Sign in failed. Check your credentials.')
+        const msg = err.message || ''
+        if (msg.toLowerCase().includes('email not confirmed') || msg.toLowerCase().includes('email_not_confirmed')) {
+          setError('Your email is not confirmed. Check your inbox and click the confirmation link, or ask the admin to disable email confirmation in Supabase.')
+        } else if (msg.toLowerCase().includes('invalid login credentials') || msg.toLowerCase().includes('invalid_credentials')) {
+          setError('Wrong email or password. Try again or use a demo account below.')
+        } else if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('fetch')) {
+          setError('Network error. Check your internet connection and try again.')
+        } else {
+          setError(msg || 'Sign in failed. Check your credentials.')
+        }
         return
       }
       // onAuthStateChange in AuthContext will update profile → App re-renders
@@ -333,10 +342,22 @@ export default function AuthPage({ onLogin }: Props) {
                   </div>
                 )}
 
-                <button type="submit" style={submitBtnStyle}>
-                  {tab === 'login' ? 'Sign In →' : 'Continue →'}
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  style={{ ...submitBtnStyle, opacity: submitting ? 0.7 : 1, cursor: submitting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                >
+                  {submitting ? (
+                    <>
+                      <span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,.4)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin .7s linear infinite' }} />
+                      Signing in...
+                    </>
+                  ) : (
+                    tab === 'login' ? 'Sign In →' : 'Continue →'
+                  )}
                 </button>
               </form>
+              <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
 
               {tab === 'login' && (
                 <div style={{ marginTop: 14, padding: '11px 14px', background: '#F0FFF4', borderRadius: 10, border: '1px solid #C6F6D5' }}>
@@ -393,8 +414,17 @@ export default function AuthPage({ onLogin }: Props) {
                 </div>
               )}
 
-              <button onClick={handleFinish} style={{ ...submitBtnStyle, opacity: selectedRole ? 1 : 0.55 }}>
-                Create Account →
+              <button
+                onClick={handleFinish}
+                disabled={submitting || !selectedRole}
+                style={{ ...submitBtnStyle, opacity: (selectedRole && !submitting) ? 1 : 0.55, cursor: (!selectedRole || submitting) ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+              >
+                {submitting ? (
+                  <>
+                    <span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,.4)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin .7s linear infinite' }} />
+                    Creating account...
+                  </>
+                ) : 'Create Account →'}
               </button>
             </>
           )}
