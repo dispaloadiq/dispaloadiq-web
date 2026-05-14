@@ -62,13 +62,49 @@ In Supabase → **Storage** → **New Bucket**, create:
    - **Project URL** → `VITE_SUPABASE_URL`
    - **anon public key** → `VITE_SUPABASE_ANON_KEY`
 
-3. Your `.env` should look like:
+3. Add your Google Maps API key (see Step 5b below) → `VITE_GOOGLE_MAPS_KEY`
+
+4. Your `.env` should look like:
    ```
    VITE_SUPABASE_URL=https://abcdefgh.supabase.co
    VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   VITE_GOOGLE_MAPS_KEY=AIzaSyABC123...
    ```
 
 > **Note:** The `.env` file is in `.gitignore` — never commit it.
+
+---
+
+## Step 5b — Enable Google Maps (3 min)
+
+Maps are used throughout the app: Live Tracking (truck positions), Route Planner (turn-by-turn routes), Dispatcher Dashboard (fleet mini-map), and Lane Heatmap (lane routes). Without a key, a beautiful dark placeholder is shown instead.
+
+### Get your API key
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com)
+2. Create a new project or select an existing one
+3. Go to **APIs & Services** → **Enable APIs** and enable:
+   - **Maps JavaScript API**
+   - **Directions API**
+   - **Geocoding API**
+4. Go to **APIs & Services** → **Credentials** → **Create Credentials** → **API Key**
+5. Copy the key
+
+### Secure your key (important for production)
+
+In the API key settings → **Application restrictions**:
+- Select **HTTP referrers** and add your domain(s): `https://yourdomain.com/*`, `http://localhost:5173/*`
+
+In **API restrictions**:
+- Select **Restrict key** and choose only the 3 APIs listed above
+
+### Add to .env
+
+```bash
+VITE_GOOGLE_MAPS_KEY=AIzaSyYOUR_KEY_HERE
+```
+
+Restart the dev server (`npm run dev`) and maps will activate automatically.
 
 ---
 

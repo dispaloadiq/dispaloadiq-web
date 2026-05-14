@@ -1,4 +1,8 @@
+// ── DispatcherMarketplace — updated with tabs for new-dispatcher UX ───────────
 import { useState } from 'react'
+import { useAuth } from '../../lib/AuthContext'
+import { useDispatcherSearch, type DispatcherSearchFilters } from '../../lib/hooks/useDispatcherProfiles'
+import type { DispatcherProfileWithUser } from '../../lib/database.types'
 
 // ─── Extended Dispatcher type ─────────────────────────────────────────────────
 interface Review {
@@ -195,8 +199,270 @@ const TRUST_LABELS: Record<string,string> = {
   dotVerified:'DOT Verified', backgroundCheck:'Background Check', referencesChecked:'References Checked', platformVerified:'Platform Verified (50+ loads)',
 }
 
+// ─── Applications mock data ───────────────────────────────────────────────────
+type AppStatus = 'pending' | 'interested' | 'declined'
+
+interface MyApplication {
+  id: string
+  ownerOp: string
+  trucks: string
+  lane: string
+  appliedAgo: string
+  status: AppStatus
+}
+
+const MY_APPLICATIONS: MyApplication[] = [
+  { id:'a1', ownerOp:'Marcus Johnson', trucks:'2x Dry Van',  lane:'Midwest→S',  appliedAgo:'2h ago',  status:'pending'    },
+  { id:'a2', ownerOp:'Elena Vasquez',  trucks:'1x Reefer',   lane:'SE→NE',      appliedAgo:'1d ago',  status:'interested' },
+  { id:'a3', ownerOp:'Robert Torres',  trucks:'2x Flatbed',  lane:'TX→SW',      appliedAgo:'3d ago',  status:'declined'   },
+]
+
+const STATUS_META: Record<AppStatus, { label: string; color: string; bg: string }> = {
+  pending:    { label: 'Pending',                   color: '#D97706', bg: '#FEF3C7' },
+  interested: { label: 'Interested — replied',      color: '#059669', bg: '#D1FAE5' },
+  declined:   { label: 'Declined',                  color: '#DC2626', bg: '#FEE2E2' },
+}
+
+// ─── My Listing preview card ──────────────────────────────────────────────────
+function MyListingPanel() {
+  return (
+    <div style={{ maxWidth: 680, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{
+        background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: 12,
+        padding: '12px 16px', fontSize: 13, color: '#166534',
+      }}>
+        You are listed on the marketplace. Here's how your profile appears to owner-ops browsing for a dispatcher.
+      </div>
+
+      {/* Profile preview card */}
+      <div style={{
+        background: '#fff', borderRadius: 16, border: '2px solid #E2E8F0',
+        overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,.08)',
+      }}>
+        {/* Header */}
+        <div style={{ background: 'linear-gradient(135deg,#1A2535,#2D7A9A)', padding: '20px', position: 'relative' }}>
+          <div style={{ position: 'absolute', top: 12, right: 12 }}>
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: '4px 10px', borderRadius: 99,
+              background: '#22C55E', color: '#fff',
+            }}>🟢 Available Now</span>
+          </div>
+          <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: 14, background: 'rgba(255,255,255,.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 26,
+            }}>👨‍💼</div>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 900, color: '#fff' }}>Alex Petrov</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,.65)', marginTop: 2 }}>📍 Chicago, IL · 3 years experience</div>
+              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#FCD34D' }}>★ 4.8</span>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,.5)' }}>· New on platform</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats strip */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', background: '#F4F6F9', borderBottom: '1px solid #E2E8F0' }}>
+          {[
+            { v: '$2.40+', l: 'RPM Guarantee', color: '#22C55E' },
+            { v: '< 15 min', l: 'Response Time', color: '#8B5CF6' },
+            { v: 'Midwest / SE', l: 'Lanes', color: '#4BAED4' },
+            { v: 'Dry Van · Reefer', l: 'Equipment', color: '#F97316' },
+          ].map(s => (
+            <div key={s.l} style={{ textAlign: 'center', padding: '12px 6px', borderRight: '1px solid #E2E8F0' }}>
+              <div style={{ fontWeight: 800, fontSize: 13, color: s.color }}>{s.v}</div>
+              <div style={{ fontSize: 10, color: '#A0AEC0', marginTop: 1 }}>{s.l}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Bio area */}
+        <div style={{ padding: '16px 20px' }}>
+          <p style={{ fontSize: 13, color: '#718096', lineHeight: 1.65, margin: '0 0 14px' }}>
+            Dispatcher specializing in Midwest and Southeast lanes. Strong broker relationships with TQL, Coyote, and Echo Global.
+            Available 6 days a week including evenings. Guaranteed $2.40+/mi minimum RPM.
+          </p>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+            {['OTR', 'Dry Van', 'Reefer', 'Midwest', 'Southeast'].map(tag => (
+              <span key={tag} style={{ fontSize: 11, padding: '3px 10px', background: '#EBF8FF', color: '#2C5282', borderRadius: 99, fontWeight: 600 }}>
+                {tag}
+              </span>
+            ))}
+          </div>
+
+          {/* Disabled CTA — preview only */}
+          <div style={{ position: 'relative' }}>
+            <button
+              disabled
+              style={{
+                width: '100%', padding: '12px', borderRadius: 10, border: 'none',
+                background: '#4BAED4', color: '#fff',
+                fontSize: 13, fontWeight: 800, cursor: 'not-allowed', opacity: 0.6,
+              }}
+            >
+              Contact Dispatcher →
+            </button>
+            <div style={{
+              position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'rgba(255,255,255,.7)', borderRadius: 10,
+              fontSize: 11, fontWeight: 700, color: '#4A5568',
+            }}>
+              👁 This is what owner-ops see — preview only
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── My Applications Tab ──────────────────────────────────────────────────────
+function MyApplicationsPanel() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ fontSize: 14, color: '#718096' }}>
+        <strong style={{ color: '#1A2535' }}>{MY_APPLICATIONS.length} proposals</strong> sent. Owner-ops with "Interested" status have replied — respond quickly!
+      </div>
+
+      <div style={{
+        background: '#fff', borderRadius: 12, border: '1.5px solid #E2E8F0',
+        overflow: 'hidden',
+      }}>
+        {/* Table header */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: '2fr 1.5fr 1.5fr 1fr 2fr 1fr',
+          gap: 0, background: '#F7FAFC', padding: '10px 18px',
+          borderBottom: '1px solid #E2E8F0',
+          fontSize: 10, fontWeight: 800, color: '#718096', letterSpacing: 0.5,
+        }}>
+          <div>OWNER-OP</div>
+          <div>TRUCKS</div>
+          <div>LANE</div>
+          <div>APPLIED</div>
+          <div>STATUS</div>
+          <div>ACTION</div>
+        </div>
+
+        {/* Table rows */}
+        {MY_APPLICATIONS.map((app, i) => {
+          const meta = STATUS_META[app.status]
+          return (
+            <div
+              key={app.id}
+              style={{
+                display: 'grid', gridTemplateColumns: '2fr 1.5fr 1.5fr 1fr 2fr 1fr',
+                gap: 0, padding: '14px 18px',
+                borderBottom: i < MY_APPLICATIONS.length - 1 ? '1px solid #F0F4F8' : 'none',
+                alignItems: 'center',
+                background: app.status === 'interested' ? '#F0FDF4' : '#fff',
+              }}
+            >
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#1A2535' }}>{app.ownerOp}</div>
+              <div style={{ fontSize: 12, color: '#4A5568' }}>{app.trucks}</div>
+              <div style={{ fontSize: 12, color: '#4A5568' }}>{app.lane}</div>
+              <div style={{ fontSize: 11, color: '#A0AEC0' }}>{app.appliedAgo}</div>
+              <div>
+                <span style={{
+                  fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 99,
+                  background: meta.bg, color: meta.color,
+                }}>
+                  {app.status === 'pending' ? '🟡' : app.status === 'interested' ? '🟢' : '🔴'} {meta.label}
+                </span>
+              </div>
+              <div>
+                <button style={{
+                  padding: '5px 12px', borderRadius: 7, border: 'none', cursor: 'pointer',
+                  fontSize: 11, fontWeight: 700,
+                  background: app.status === 'interested' ? '#22C55E' : app.status === 'declined' ? '#F3F4F6' : '#4BAED4',
+                  color: app.status === 'declined' ? '#9CA3AF' : '#fff',
+                }}>
+                  {app.status === 'interested' ? 'Reply' : app.status === 'declined' ? 'Archive' : 'View'}
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {MY_APPLICATIONS.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '60px 0', color: '#A0AEC0' }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>📨</div>
+          <div style={{ fontWeight: 600, fontSize: 15, color: '#4A5568' }}>No proposals sent yet</div>
+          <div style={{ fontSize: 13, marginTop: 6 }}>Browse owner-ops and send your first proposal</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
+type MarketplaceTab = 'find' | 'listings' | 'applications'
+
+// ── Helper: convert a real Supabase dispatcher profile to the local DispatcherEx shape ──
+function realToDispatcherEx(d: DispatcherProfileWithUser): DispatcherEx {
+  const name = d.user_profiles?.full_name ?? 'Dispatcher'
+  const city = d.user_profiles?.city ?? ''
+  const state = d.user_profiles?.state ?? ''
+  const location = city && state ? `${city}, ${state}` : city || state || 'USA'
+
+  const availMap: Record<string, DispatcherEx['availability']> = {
+    available: 'available', limited: 'limited', busy: 'busy',
+  }
+
+  const pricingModel: DispatcherEx['pricing']['model'] =
+    d.commission_rate > 0 ? 'percent' : 'flat'
+
+  return {
+    id:         d.user_id,
+    name,
+    avatar:     '👨‍💼',
+    location,
+    rating:     d.trust_score / 20,   // trust_score 0-100 → rating 0-5
+    reviewCount: 0,
+    experience: 0,
+    specializations: d.specialties,
+    regions:    d.active_states,
+    languages:  d.languages,
+    pricing: {
+      model: pricingModel,
+      value: d.commission_rate,
+      label: d.commission_rate > 0 ? `${d.commission_rate}% of gross` : 'Custom pricing',
+    },
+    avgRpm:         d.avg_rpm,
+    rpmGuarantee:   d.min_rpm > 0 ? d.min_rpm : undefined,
+    activeClients:  d.current_clients,
+    loadsPerMonth:  Math.round(d.total_loads / 12),
+    loadsTotal:     d.total_loads,
+    responseTime:   `< ${d.response_time_min} min`,
+    responseScore:  Math.min(100, Math.round(100 - d.response_time_min / 2)),
+    onTimeRate:     Math.round(d.on_time_rate),
+    completionRate: Math.round(d.client_retention),
+    availability:   availMap[d.availability] ?? 'available',
+    topPerformer:   d.trust_score >= 90,
+    trust: {
+      dotVerified:       d.identity_verified,
+      backgroundCheck:   d.verification_status === 'verified' || d.verification_status === 'certified',
+      referencesChecked: d.certifications.length > 0,
+      platformVerified:  d.total_loads >= 50,
+    },
+    bio:              d.bio ?? '',
+    trialAvailable:   false,
+    trialDays:        0,
+    minContractMonths: 1,
+    reviews:          [],
+    performanceHistory: d.portfolio_loads.slice(-6).map((pl, i) => ({
+      month: ['Nov','Dec','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct'][i % 12],
+      rpm:   pl.rpm,
+    })),
+  }
+}
+
 export default function DispatcherMarketplace() {
+  const { profile } = useAuth()
+  const [activeTab,    setActiveTab]    = useState<MarketplaceTab>('find')
   const [search,       setSearch]       = useState('')
   const [spec,         setSpec]         = useState('All')
   const [region,       setRegion]       = useState('All Regions')
@@ -218,7 +484,34 @@ export default function DispatcherMarketplace() {
   const [showFilters,  setShowFilters]  = useState(false)
   const [mode,         setMode]         = useState<'browse'|'post'>('browse')
 
-  const filtered = DISPATCHERS
+  // ── Build Supabase filters from local UI state ──────────────────────────────
+  const supabaseFilters: DispatcherSearchFilters = {
+    search:       search || undefined,
+    specialties:  spec !== 'All' ? [spec] : undefined,
+    states:       region !== 'All Regions' ? [region] : undefined,
+    verifiedOnly: verifiedOnly || undefined,
+    minRpm:       minRpm ? parseFloat(minRpm) : undefined,
+    maxCommission: maxFee ? parseFloat(maxFee) : undefined,
+    availability: avail !== 'all' ? avail : undefined,
+    pageSize: 50,
+  }
+
+  const { data: supabaseResult, isLoading: supabaseLoading } =
+    useDispatcherSearch(supabaseFilters)
+
+  // ── Decide data source: real DB when rows present, else demo mock ──────────
+  const realDispatchers: DispatcherEx[] =
+    (supabaseResult?.items ?? []).length > 0
+      ? (supabaseResult!.items.map(realToDispatcherEx))
+      : []
+
+  const sourceDispatchers: DispatcherEx[] =
+    realDispatchers.length > 0 ? realDispatchers : DISPATCHERS
+
+  // suppress unused profile warning — used for future role-gating
+  void profile
+
+  const filtered = sourceDispatchers
     .filter(d => {
       const q = search.toLowerCase()
       if (q && !d.name.toLowerCase().includes(q) && !d.location.toLowerCase().includes(q) && !d.specializations.some(s=>s.toLowerCase().includes(q))) return false
@@ -249,7 +542,7 @@ export default function DispatcherMarketplace() {
     )
   }
 
-  const compareDispatchers = DISPATCHERS.filter(d => comparing.includes(d.id))
+  const compareDispatchers = sourceDispatchers.filter(d => comparing.includes(d.id))
 
   // Simulated AI match
   function runMatch() {
@@ -258,8 +551,65 @@ export default function DispatcherMarketplace() {
     setTimeout(() => { setMatchResult(DISPATCHERS[0]); setMatchStep(3) }, 1600)
   }
 
+  // Pending apps count for badge
+  const pendingApps = MY_APPLICATIONS.filter(a => a.status === 'pending' || a.status === 'interested').length
+
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:0, height:'calc(100vh - 64px - 48px)', overflow:'hidden' }}>
+
+      {/* ── Top Tab Switcher ── */}
+      <div style={{
+        display: 'flex', gap: 4, marginBottom: 16, flexShrink: 0,
+        background: '#fff', borderRadius: 12, border: '1.5px solid #E2E8F0',
+        padding: 5,
+      }}>
+        {(([
+          { id: 'find' as MarketplaceTab,         label: '🔍 Find Owner-Ops',           count: undefined as number | undefined },
+          { id: 'listings' as MarketplaceTab,     label: '📣 My Listings',              count: undefined as number | undefined },
+          { id: 'applications' as MarketplaceTab, label: '📨 My Applications',          count: pendingApps as number | undefined },
+        ])).map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            style={{
+              flex: 1, padding: '9px 14px', borderRadius: 8, border: 'none',
+              cursor: 'pointer', fontWeight: 700, fontSize: 13, display: 'flex',
+              alignItems: 'center', justifyContent: 'center', gap: 6,
+              background: activeTab === tab.id ? '#1A2535' : 'transparent',
+              color: activeTab === tab.id ? '#fff' : '#718096',
+              transition: 'all .15s',
+            }}
+          >
+            {tab.label}
+            {tab.count !== undefined && tab.count > 0 && (
+              <span style={{
+                fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 99,
+                background: activeTab === tab.id ? 'rgba(255,255,255,.25)' : '#EBF8FF',
+                color: activeTab === tab.id ? '#fff' : '#2C5282',
+              }}>
+                {tab.count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ── My Applications tab ── */}
+      {activeTab === 'applications' && (
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <MyApplicationsPanel />
+        </div>
+      )}
+
+      {/* ── My Listings tab ── */}
+      {activeTab === 'listings' && (
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <MyListingPanel />
+        </div>
+      )}
+
+      {/* ── Find Owner-Ops tab content (existing) ── */}
+      {activeTab === 'find' && (<>
 
       {/* ── Mode switcher + hero ── */}
       <div style={{ background:'linear-gradient(135deg,#1A2535,#2D7A9A)', borderRadius:16, padding:'20px 24px', marginBottom:16, flexShrink:0 }}>
@@ -397,7 +747,8 @@ export default function DispatcherMarketplace() {
                 </span>
                 <div style={{ display:'flex', gap:8, flex:1 }}>
                   {comparing.map(id => {
-                    const d = DISPATCHERS.find(d=>d.id===id)!
+                    const d = sourceDispatchers.find(d=>d.id===id)!
+                    if (!d) return null
                     return (
                       <span key={id} style={{ background:'#BEE3F8', color:'#2A4365', padding:'3px 10px', borderRadius:99, fontSize:12, fontWeight:600 }}>
                         {d.name.split(' ')[0]} ✕
@@ -412,9 +763,17 @@ export default function DispatcherMarketplace() {
               </div>
             )}
 
-            {/* Results count */}
-            <div style={{ fontSize:13, color:'#718096', flexShrink:0, display:'flex', justifyContent:'space-between' }}>
-              <span><strong>{filtered.length}</strong> dispatchers found</span>
+            {/* Results count + live indicator */}
+            <div style={{ fontSize:13, color:'#718096', flexShrink:0, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span>
+                <strong>{filtered.length}</strong> dispatchers found
+                {realDispatchers.length > 0 && (
+                  <span style={{ marginLeft:8, fontSize:11, color:'#38C770', fontWeight:700 }}>● Live</span>
+                )}
+                {supabaseLoading && (
+                  <span style={{ marginLeft:8, fontSize:11, color:'#A0AEC0' }}>⏳ Loading…</span>
+                )}
+              </span>
               {filtered.length > 0 && <span style={{ color:'#A0AEC0' }}>Click any card to view full profile</span>}
             </div>
 
@@ -472,6 +831,9 @@ export default function DispatcherMarketplace() {
           )}
         </div>
       )}
+
+      {/* ── End Find Owner-Ops tab ── */}
+      </>)}
 
       {/* ── Hire / Contract Modal ── */}
       {hireModal && (

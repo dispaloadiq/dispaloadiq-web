@@ -6,6 +6,7 @@ import Sidebar               from './components/Sidebar'
 import Header                from './components/Header'
 import OODashboard           from './pages/owner-op/OODashboard'
 import DispatcherDashboard   from './pages/dispatcher/DispatcherDashboard'
+import NewDispatcherDashboard from './pages/dispatcher/NewDispatcherDashboard'
 import DispatcherMarketplace from './pages/dispatcher/DispatcherMarketplace'
 import CompanyDashboard      from './pages/company/CompanyDashboard'
 import ShipperDashboard      from './pages/shipper/ShipperDashboard'
@@ -57,6 +58,32 @@ import LaneHeatmapPage        from './pages/lanes/LaneHeatmapPage'
 import FuelOptimizerPage      from './pages/fuel-optimizer/FuelOptimizerPage'
 import CarrierScorecardPage   from './pages/scorecard/CarrierScorecardPage'
 import ClaimsDamagePage       from './pages/claims/ClaimsDamagePage'
+import LoadNegotiationPage    from './pages/dispatcher/LoadNegotiationPage'
+import PayoutTrackerPage      from './pages/dispatcher/PayoutTrackerPage'
+import AIMatchPage            from './pages/dispatcher/AIMatchPage'
+import DealTrackerPage        from './pages/dispatcher/DealTrackerPage'
+import DriverCommsPage        from './pages/dispatcher/DriverCommsPage'
+import DispatcherPnLPage      from './pages/dispatcher/DispatcherPnLPage'
+import EmergencyLoadPage      from './pages/dispatcher/EmergencyLoadPage'
+import RCAnalyzerPage         from './pages/dispatcher/RCAnalyzerPage'
+import BackhaulFinderPage     from './pages/dispatcher/BackhaulFinderPage'
+import ProactiveDispatchPage  from './pages/dispatcher/ProactiveDispatchPage'
+import LoadDocFlowPage        from './pages/dispatcher/LoadDocFlowPage'
+import MarketRateIntelPage    from './pages/dispatcher/MarketRateIntelPage'
+import OwnerOpFindDispatcherPage from './pages/marketplace/OwnerOpFindDispatcherPage'
+import DispatcherOpportunitiesPage from './pages/dispatcher/DispatcherOpportunitiesPage'
+import DispatcherVerificationPage from './pages/dispatcher/DispatcherVerificationPage'
+import DispatcherSkillsTestPage   from './pages/dispatcher/DispatcherSkillsTestPage'
+import DispatcherAcademyPage      from './pages/academy/DispatcherAcademyPage'
+import BrokerTrustNetworkPage       from './pages/brokers/BrokerTrustNetworkPage'
+import LoadStatusProtocolPage      from './pages/loads/LoadStatusProtocolPage'
+import QuickPayPage                from './pages/finance/QuickPayPage'
+import SmartContractBuilderPage    from './pages/contracts/SmartContractBuilderPage'
+import DispatcherScorecardPage     from './pages/dispatcher/DispatcherScorecardPage'
+import DispatcherWorkspacePage     from './pages/dispatcher/DispatcherWorkspacePage'
+import EarningsCalculatorPage      from './pages/dispatcher/EarningsCalculatorPage'
+import DispatcherPublicProfilePage from './pages/dispatcher/DispatcherPublicProfilePage'
+import GrowthReferralPage          from './pages/growth/GrowthReferralPage'
 
 // ── Placeholder pages ─────────────────────────────────────────────────────────
 function Placeholder({ title, icon }: { title: string; icon: string }) {
@@ -70,7 +97,7 @@ function Placeholder({ title, icon }: { title: string; icon: string }) {
 }
 
 // ── Page router ───────────────────────────────────────────────────────────────
-function PageContent({ role, page, userName, onNavigate }: { role: UserRole; page: string; userName: string; onNavigate: (p: string) => void }) {
+function PageContent({ role, page, userName, onNavigate, dispatcherIsNew }: { role: UserRole; page: string; userName: string; onNavigate: (p: string) => void; dispatcherIsNew: boolean }) {
   // ── Shared pages (available to all roles) ──────────────────────────────────
   if (page === 'marketplace') return <DispatcherMarketplace />
   if (page === 'loads')       return <LoadBoardPage />
@@ -121,6 +148,32 @@ function PageContent({ role, page, userName, onNavigate }: { role: UserRole; pag
   if (page === 'fuel-optimizer')       return <FuelOptimizerPage role={role} />
   if (page === 'carrier-scorecard')   return <CarrierScorecardPage role={role} />
   if (page === 'claims')             return <ClaimsDamagePage role={role} />
+  if (page === 'load-negotiation')   return <LoadNegotiationPage />
+  if (page === 'payout-tracker')     return <PayoutTrackerPage />
+  if (page === 'ai-match')           return <AIMatchPage />
+  if (page === 'deal-tracker')       return <DealTrackerPage />
+  if (page === 'driver-comms')       return <DriverCommsPage />
+  if (page === 'dispatcher-pnl')     return <DispatcherPnLPage />
+  if (page === 'emergency-load')     return <EmergencyLoadPage />
+  if (page === 'rc-analyzer')        return <RCAnalyzerPage />
+  if (page === 'backhaul-finder')    return <BackhaulFinderPage />
+  if (page === 'proactive-dispatch') return <ProactiveDispatchPage />
+  if (page === 'doc-flow')           return <LoadDocFlowPage />
+  if (page === 'rate-intel')         return <MarketRateIntelPage />
+  if (page === 'find-dispatcher')    return <OwnerOpFindDispatcherPage />
+  if (page === 'opportunities')      return <DispatcherOpportunitiesPage />
+  if (page === 'verification')       return <DispatcherVerificationPage onNavigate={onNavigate} />
+  if (page === 'skills-test')        return <DispatcherSkillsTestPage onNavigate={onNavigate} />
+  if (page === 'academy')            return <DispatcherAcademyPage />
+  if (page === 'broker-trust')       return <BrokerTrustNetworkPage />
+  if (page === 'load-status')        return <LoadStatusProtocolPage />
+  if (page === 'quick-pay')          return <QuickPayPage />
+  if (page === 'smart-contract')     return <SmartContractBuilderPage />
+  if (page === 'dispatcher-scorecard') return <DispatcherScorecardPage />
+  if (page === 'workspace')            return <DispatcherWorkspacePage />
+  if (page === 'earnings-calculator')  return <EarningsCalculatorPage />
+  if (page === 'public-profile')       return <DispatcherPublicProfilePage />
+  if (page === 'referral')             return <GrowthReferralPage />
 
   // ── Role-specific dashboards ───────────────────────────────────────────────
   switch (role) {
@@ -128,7 +181,9 @@ function PageContent({ role, page, userName, onNavigate }: { role: UserRole; pag
       if (page === 'dashboard') return <OODashboard onNavigate={onNavigate} />
       break
     case 'dispatcher':
-      if (page === 'dashboard') return <DispatcherDashboard onNavigate={onNavigate} />
+      if (page === 'dashboard') return dispatcherIsNew
+        ? <NewDispatcherDashboard onNavigate={onNavigate} />
+        : <DispatcherDashboard onNavigate={onNavigate} />
       break
     case 'company':
       if (page === 'dashboard') return <CompanyDashboard onNavigate={onNavigate} />
@@ -148,8 +203,9 @@ export default function App() {
   const [page, setPage] = useState('dashboard')
 
   // Demo fallback: when no Supabase session, store role locally
-  const [demoRole, setDemoRole] = useState<UserRole | null>(null)
-  const [demoName, setDemoName] = useState<string>('')
+  const [demoRole, setDemoRole]       = useState<UserRole | null>(null)
+  const [demoName, setDemoName]       = useState<string>('')
+  const [dispatcherIsNew, setDispatcherIsNew] = useState(false)
 
   // While checking session
   if (loading) {
@@ -170,9 +226,10 @@ export default function App() {
   if (!profile && !demoRole) {
     return (
       <AuthPage
-        onLogin={(role: UserRole, name: string) => {
+        onLogin={(role: UserRole, name: string, isNew?: boolean) => {
           setDemoRole(role)
           setDemoName(name)
+          setDispatcherIsNew(role === 'dispatcher' && (isNew ?? false))
           setPage('dashboard')
         }}
       />
@@ -189,7 +246,8 @@ export default function App() {
         activePage={page}
         userName={userName}
         onNavigate={setPage}
-        onLogout={() => { signOut(); setDemoRole(null); setDemoName('') }}
+        onLogout={() => { signOut(); setDemoRole(null); setDemoName(''); setDispatcherIsNew(false) }}
+        dispatcherIsNew={role === 'dispatcher' && dispatcherIsNew}
       />
       <div className="main-area">
         <Header
@@ -201,7 +259,7 @@ export default function App() {
           onNotifClick={() => setPage('chat')}
         />
         <main className="page-content">
-          <PageContent role={role} page={page} userName={userName} onNavigate={setPage} />
+          <PageContent role={role} page={page} userName={userName} onNavigate={setPage} dispatcherIsNew={dispatcherIsNew} />
         </main>
       </div>
     </div>

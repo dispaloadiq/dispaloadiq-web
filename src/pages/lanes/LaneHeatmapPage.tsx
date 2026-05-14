@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import type { UserRole } from '../../types'
+import MapView, { type RouteWaypoint } from '../../components/MapView'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type HeatMetric = 'rpm' | 'profit' | 'volume'
@@ -569,9 +570,83 @@ function LaneRow({ lane, highlight }: { lane: Lane; highlight: string }) {
   )
 }
 
+// ─── City coordinates for lane route map ─────────────────────────────────────
+const LANE_CITY_COORDS: Record<string, { lat: number; lng: number }> = {
+  'Jacksonville': { lat: 30.332, lng: -81.656 },
+  'Atlanta':      { lat: 33.749, lng: -84.388 },
+  'Miami':        { lat: 25.761, lng: -80.192 },
+  'Charlotte':    { lat: 35.227, lng: -80.843 },
+  'Tampa':        { lat: 27.948, lng: -82.459 },
+  'Houston':      { lat: 29.760, lng: -95.369 },
+  'Orlando':      { lat: 28.538, lng: -81.379 },
+  'New York':     { lat: 40.713, lng: -74.006 },
+  'Chicago':      { lat: 41.878, lng: -87.630 },
+  'Dallas':       { lat: 32.776, lng: -96.797 },
+  'Los Angeles':  { lat: 34.052, lng: -118.244 },
+  'Phoenix':      { lat: 33.448, lng: -112.074 },
+  'Denver':       { lat: 39.739, lng: -104.984 },
+  'Seattle':      { lat: 47.608, lng: -122.335 },
+  'Minneapolis':  { lat: 44.980, lng: -93.265 },
+  'Kansas City':  { lat: 39.099, lng: -94.579 },
+  'Nashville':    { lat: 36.174, lng: -86.767 },
+  'Memphis':      { lat: 35.150, lng: -90.048 },
+  'Indianapolis': { lat: 39.768, lng: -86.158 },
+  'Columbus':     { lat: 39.961, lng: -82.999 },
+  'Louisville':   { lat: 38.252, lng: -85.758 },
+  'Detroit':      { lat: 42.331, lng: -83.046 },
+  'Cleveland':    { lat: 41.500, lng: -81.695 },
+  'Pittsburgh':   { lat: 40.440, lng: -79.996 },
+  'Philadelphia': { lat: 39.952, lng: -75.164 },
+  'Boston':       { lat: 42.360, lng: -71.059 },
+  'Baltimore':    { lat: 39.290, lng: -76.612 },
+  'Richmond':     { lat: 37.541, lng: -77.434 },
+  'Raleigh':      { lat: 35.779, lng: -78.638 },
+  'Savannah':     { lat: 32.082, lng: -81.100 },
+  'New Orleans':  { lat: 29.951, lng: -90.072 },
+  'Baton Rouge':  { lat: 30.451, lng: -91.154 },
+  'St. Louis':    { lat: 38.627, lng: -90.197 },
+  'Oklahoma City':{ lat: 35.468, lng: -97.516 },
+  'Tulsa':        { lat: 36.154, lng: -95.993 },
+  'San Antonio':  { lat: 29.424, lng: -98.494 },
+  'El Paso':      { lat: 31.758, lng: -106.488 },
+  'Albuquerque':  { lat: 35.085, lng: -106.650 },
+  'Salt Lake City':{ lat: 40.760, lng: -111.891 },
+  'Las Vegas':    { lat: 36.175, lng: -115.136 },
+  'Sacramento':   { lat: 38.581, lng: -121.494 },
+  'San Francisco':{ lat: 37.774, lng: -122.419 },
+  'San Diego':    { lat: 32.716, lng: -117.161 },
+  'Portland':     { lat: 45.523, lng: -122.676 },
+  'Spokane':      { lat: 47.659, lng: -117.426 },
+  'Boise':        { lat: 43.615, lng: -116.202 },
+  'Pocatello':    { lat: 42.866, lng: -112.446 },
+  'Des Moines':   { lat: 41.600, lng: -93.609 },
+  'Iowa City':    { lat: 41.661, lng: -91.530 },
+  'Omaha':        { lat: 41.257, lng: -95.938 },
+  'Wichita':      { lat: 37.688, lng: -97.336 },
+  'Lexington':    { lat: 38.040, lng: -84.503 },
+  'Honolulu':     { lat: 21.306, lng: -157.858 },
+  'Portland ME':  { lat: 43.658, lng: -70.257 },
+  'Bangor':       { lat: 44.801, lng: -68.778 },
+  'Augusta':      { lat: 44.311, lng: -69.779 },
+  'Billings':     { lat: 45.786, lng: -108.501 },
+  'Cheyenne':     { lat: 41.140, lng: -104.820 },
+  'Casper':       { lat: 42.867, lng: -106.313 },
+}
+
+function laneToWaypoints(fromCity: string, fromState: string, toCity: string, toState: string): RouteWaypoint[] {
+  const orig = LANE_CITY_COORDS[fromCity]
+  const dest = LANE_CITY_COORDS[toCity]
+  if (!orig || !dest) return []
+  return [
+    { lat: orig.lat, lng: orig.lng, label: `${fromCity}, ${fromState}`, type: 'origin' },
+    { lat: dest.lat, lng: dest.lng, label: `${toCity}, ${toState}`,   type: 'destination' },
+  ]
+}
+
 // ─── State Detail Panel ───────────────────────────────────────────────────────
 function StateDetailPanel({ stateId, metric }: { stateId: string | null; metric: HeatMetric }) {
   const [lanesFilter, setLanesFilter] = useState<'all' | 'out' | 'in'>('all')
+  const [selectedLaneIdx, setSelectedLaneIdx] = useState<number | null>(null)
 
   if (!stateId || !STATE_DATA[stateId]) {
     return (
@@ -692,13 +767,49 @@ function StateDetailPanel({ stateId, metric }: { stateId: string | null; metric:
           </div>
           {filteredLanes.length > 0 ? (
             filteredLanes.map((lane, i) => (
-              <LaneRow key={i} lane={lane} highlight={stateId} />
+              <div
+                key={i}
+                onClick={() => setSelectedLaneIdx(selectedLaneIdx === i ? null : i)}
+                style={{ cursor: 'pointer', borderRadius: 8, outline: selectedLaneIdx === i ? '2px solid #4BAED4' : 'none' }}
+              >
+                <LaneRow lane={lane} highlight={stateId} />
+              </div>
             ))
           ) : (
             <div style={{ textAlign: 'center', padding: '24px', color: '#A0AEC0', fontSize: 13 }}>
               No lanes in this direction
             </div>
           )}
+
+          {/* Route map for selected lane */}
+          {selectedLaneIdx !== null && filteredLanes[selectedLaneIdx] && (() => {
+            const lane = filteredLanes[selectedLaneIdx]
+            const wps = laneToWaypoints(lane.fromCity, lane.from, lane.toCity, lane.to)
+            if (wps.length < 2) return null
+            const center = { lat: (wps[0].lat + wps[1].lat) / 2, lng: (wps[0].lng + wps[1].lng) / 2 }
+            return (
+              <div style={{ marginTop: 12, borderRadius: 10, overflow: 'hidden', border: '1px solid #BEE3F8' }}>
+                <div style={{ padding: '6px 10px', background: '#EBF8FF', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#2D7A9A' }}>
+                    🗺️ {lane.fromCity} → {lane.toCity} · {lane.miles.toLocaleString()} mi · ${lane.avgRPM.toFixed(2)}/mi
+                  </div>
+                  <button
+                    onClick={() => setSelectedLaneIdx(null)}
+                    style={{ fontSize: 11, color: '#718096', background: 'none', border: 'none', cursor: 'pointer' }}
+                  >✕</button>
+                </div>
+                <MapView
+                  height={200}
+                  center={center}
+                  zoom={5}
+                  waypoints={wps}
+                  useDirections={true}
+                  dark={false}
+                  compact={true}
+                />
+              </div>
+            )
+          })()}
         </div>
       </div>
     </div>

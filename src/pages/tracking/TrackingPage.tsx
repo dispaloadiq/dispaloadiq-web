@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import MapView, { type TruckMarker, type RouteWaypoint } from '../../components/MapView'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface ActiveLoad {
@@ -248,6 +249,59 @@ const MAP_ROUTES: Record<string, MapDot[]> = {
     { x: 8,  y: 45, label: 'Los Angeles, CA', type: 'origin' },
     { x: 14, y: 48, label: 'Phoenix, AZ',     type: 'destination' },
   ],
+}
+
+// ── Real coordinates for Google Maps ──────────────────────────────────────────
+const LOAD_WAYPOINTS: Record<string, RouteWaypoint[]> = {
+  'LD-4821': [
+    { lat: 41.878, lng: -87.630, label: 'Chicago, IL',    type: 'origin' },
+    { lat: 38.627, lng: -90.197, label: 'St. Louis, MO',  type: 'stop' },
+    { lat: 37.208, lng: -93.293, label: 'Springfield, MO',type: 'stop' },
+    { lat: 32.776, lng: -96.797, label: 'Dallas, TX',     type: 'destination' },
+  ],
+  'LD-4819': [
+    { lat: 25.775, lng: -80.208, label: 'Miami, FL',         type: 'origin' },
+    { lat: 26.122, lng: -80.143, label: 'Fort Lauderdale, FL', type: 'stop' },
+    { lat: 33.749, lng: -84.388, label: 'Atlanta, GA',       type: 'destination' },
+  ],
+  'LD-4823': [
+    { lat: 29.760, lng: -95.369, label: 'Houston, TX',       type: 'origin' },
+    { lat: 35.467, lng: -97.517, label: 'Oklahoma City, OK', type: 'stop' },
+    { lat: 39.099, lng: -94.578, label: 'Kansas City, MO',   type: 'destination' },
+  ],
+  'LD-4820': [
+    { lat: 47.606, lng: -122.332, label: 'Seattle, WA',  type: 'origin' },
+    { lat: 47.021, lng: -122.900, label: 'Olympia, WA',  type: 'stop' },
+    { lat: 45.523, lng: -122.676, label: 'Portland, OR', type: 'destination' },
+  ],
+  'LD-4818': [
+    { lat: 36.162, lng: -86.781, label: 'Nashville, TN', type: 'origin' },
+    { lat: 35.578, lng: -82.551, label: 'Asheville, NC', type: 'stop' },
+    { lat: 35.227, lng: -80.843, label: 'Charlotte, NC', type: 'destination' },
+  ],
+  'LD-4815': [
+    { lat: 34.052, lng: -118.244, label: 'Los Angeles, CA', type: 'origin' },
+    { lat: 33.448, lng: -112.074, label: 'Phoenix, AZ',     type: 'destination' },
+  ],
+}
+
+const LOAD_CENTERS: Record<string, { lat: number; lng: number }> = {
+  'LD-4821': { lat: 37.5,  lng: -92.2  },
+  'LD-4819': { lat: 29.5,  lng: -82.0  },
+  'LD-4823': { lat: 33.5,  lng: -96.0  },
+  'LD-4820': { lat: 46.5,  lng: -122.5 },
+  'LD-4818': { lat: 35.7,  lng: -83.8  },
+  'LD-4815': { lat: 33.7,  lng: -115.2 },
+}
+
+// Current truck positions (interpolated by progress %)
+const LOAD_CURRENT_POS: Record<string, TruckMarker> = {
+  'LD-4821': { id: 'LD-4821', lat: 37.208, lng: -93.293, label: 'Mike R.',   status: 'in_transit', info: 'LD-4821 · 68% · ETA 4:45 PM' },
+  'LD-4819': { id: 'LD-4819', lat: 26.122, lng: -80.143, label: 'Anna P.',   status: 'in_transit', info: 'LD-4819 · 12% · Picking Up' },
+  'LD-4823': { id: 'LD-4823', lat: 35.467, lng: -97.517, label: 'Carlos V.', status: 'in_transit', info: 'LD-4823 · 44% · DELAYED +75min' },
+  'LD-4820': { id: 'LD-4820', lat: 47.021, lng: -122.9,  label: 'Linda K.',  status: 'in_transit', info: 'LD-4820 · 81% · ETA 3:10 PM' },
+  'LD-4818': { id: 'LD-4818', lat: 35.578, lng: -82.551, label: 'Brian S.',  status: 'in_transit', info: 'LD-4818 · 57% · ETA 5:00 PM' },
+  'LD-4815': { id: 'LD-4815', lat: 33.448, lng: -112.07, label: 'James C.',  status: 'delivered',  info: 'LD-4815 · Delivered' },
 }
 
 const STATE_ABBRS = [
@@ -736,7 +790,15 @@ export default function TrackingPage() {
         {detailTab === 'map' && (
           <div style={{ padding: 20 }}>
             <div style={{ height: 420 }}>
-              <USAMap loadId={selectedId} progress={selected.progress} />
+              <MapView
+                height={420}
+                center={LOAD_CENTERS[selectedId]}
+                zoom={6}
+                trucks={LOAD_CURRENT_POS[selectedId] ? [LOAD_CURRENT_POS[selectedId]] : []}
+                waypoints={LOAD_WAYPOINTS[selectedId] ?? []}
+                useDirections={true}
+                dark={false}
+              />
             </div>
             <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
               {[

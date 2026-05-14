@@ -1,4 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
+import { useAuth } from '../../lib/AuthContext'
+import {
+  useConversations,
+  useMessages as useSupabaseMessages,
+  useSendMessage,
+  useMarkRead,
+  type ConversationWithParticipant,
+} from '../../lib/hooks/useMessages'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ContactType = 'driver' | 'dispatcher' | 'broker' | 'carrier' | 'system' | 'group'
@@ -492,8 +500,47 @@ function MessageBubble({ msg, contact, onPin }: {
   )
 }
 
+// ── Helper: convert real conversation to local Contact shape ──────────────────
+function convToContact(conv: ConversationWithParticipant): Contact {
+  const p = conv.otherParticipant
+  const roleMap: Record<string, ContactType> = {
+    dispatcher: 'dispatcher',
+    'owner-op':  'driver',
+    company:     'carrier',
+    shipper:     'broker',
+  }
+  const type: ContactType = roleMap[p.role] ?? 'driver'
+  const lastTime = conv.last_message_at
+    ? new Date(conv.last_message_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    : ''
+  return {
+    id:          conv.id,
+    name:        p.full_name,
+    type,
+    lastMessage: conv.last_message ?? '',
+    lastTime,
+    unread:      conv.unread_count,
+    online:      false,
+    avatar:      p.avatar_url ?? undefined,
+  }
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ChatPage() {
+  const { profile } = useAuth()
+  const userId = profile?.id
+
+  // ── Supabase real data ──────────────────────────────────────────────────────
+  const { data: realConversations } = useConversations(userId)
+  const [selectedConvId, setSelectedConvId] = useState<string | null>(null)
+  const { data: realMessages } = useSupabaseMessages(selectedConvId ?? undefined)
+  const sendMessageMutation = useSendMessage()
+  const markReadMutation = useMarkRead()
+
+  // ── Derive display contacts (real or mock) ─────────────────────────────────
+  const realContacts: Contact[] = (realConversations ?? []).map(convToContact)
+  const usingRealContacts = realContacts.length > 0
+
   const [activeTab, setActiveTab] = useState<'chat' | 'notifications'>('chat')
   const [selectedContactId, setSelectedContactId] = useState<string>(CONTACTS[0].id)
   const [messages, setMessages] = useState<Record<string, Message[]>>(MESSAGES_BY_CONTACT)
@@ -508,10 +555,37 @@ export default function ChatPage() {
   const [filterType, setFilterType] = useState<ContactType | 'all'>('all')
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const selectedContact = CONTACTS.find(c => c.id === selectedContactId)!
-  const currentMessages = messages[selectedContactId] ?? []
+  // The active contact list is real conversations (if any) or mock
+  const allContacts: Contact[] = usingRealContacts ? realContacts : CONTACTS
 
-  const filteredContacts = CONTACTS.filter(c => {
+  // Sync selectedContactId: when real convs load, switch to first one
+  useEffect(() => {
+    if (usingRealContacts && realContacts.length > 0 && !selectedConvId) {
+      const first = realContacts[0]
+      setSelectedConvId(first.id)
+      setSelectedContactId(first.id)
+    }
+  }, [usingRealContacts, realContacts.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selectedContact = allContacts.find(c => c.id === selectedContactId) ?? allContacts[0]
+
+  // Build real messages as local Message[] shape
+  const realLocalMessages: Message[] = (realMessages ?? []).map(m => ({
+    id:     typeof m.id === 'string' ? m.id.charCodeAt(0) : (m.id as unknown as number),
+    from:   m.sender_id === userId ? 'me' : 'them',
+    text:   m.content,
+    time:   new Date(m.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+    status: 'read' as const,
+    type:   (m.message_type === 'text' ? 'text' : m.message_type === 'system' ? 'system' : 'text') as Message['type'],
+  }))
+
+  // Current messages: real when a real conv is selected, mock otherwise
+  const usingRealMessages = usingRealContacts && selectedConvId !== null && (realMessages ?? []).length > 0
+  const currentMessages: Message[] = usingRealMessages
+    ? realLocalMessages
+    : (messages[selectedContactId] ?? [])
+
+  const filteredContacts = allContacts.filter(c => {
     const matchSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
       (c.loadRef ?? '').toLowerCase().includes(search.toLowerCase())
     const matchType = filterType === 'all' || c.type === filterType
@@ -523,7 +597,7 @@ export default function ChatPage() {
     : currentMessages
 
   const unreadNotifCount = notifications.filter(n => !n.read).length
-  const totalUnread = CONTACTS.reduce((s, c) => s + c.unread, 0)
+  const totalUnread = allContacts.reduce((s, c) => s + c.unread, 0)
 
   const filteredNotifs = notifications.filter(n => {
     if (notifFilter === 'unread') return !n.read
@@ -535,9 +609,33 @@ export default function ChatPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [currentMessages.length, selectedContactId])
 
+  function handleSelectContact(contactId: string) {
+    setSelectedContactId(contactId)
+    if (usingRealContacts) {
+      setSelectedConvId(contactId)
+      if (userId) {
+        markReadMutation.mutate({ conversationId: contactId, userId })
+      }
+    }
+  }
+
   function sendMessage(text?: string) {
     const msg = text ?? draft
     if (!msg.trim()) return
+
+    // Send via Supabase if real mode
+    if (usingRealContacts && selectedConvId && userId) {
+      sendMessageMutation.mutate({
+        conversationId: selectedConvId,
+        senderId:       userId,
+        content:        msg,
+      })
+      setDraft('')
+      setShowQuickReplies(false)
+      return
+    }
+
+    // Mock fallback
     const now = new Date()
     const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
     const newMsg: Message = {
@@ -640,7 +738,7 @@ export default function ChatPage() {
             <div style={{ overflowY: 'auto', flex: 1 }}>
               {filteredContacts.map(contact => (
                 <div key={contact.id}
-                  onClick={() => setSelectedContactId(contact.id)}
+                  onClick={() => handleSelectContact(contact.id)}
                   style={{
                     padding: '11px 14px', cursor: 'pointer',
                     background: selectedContactId === contact.id ? '#EBF8FF' : 'transparent',

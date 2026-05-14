@@ -1,4 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { supabase } from '../../lib/supabase'
+import type { LoadSource } from '../../lib/loadSources'
+import type { Database } from '../../lib/database.types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Load {
@@ -26,6 +29,7 @@ interface Load {
   notes?: string
   hazmat?: boolean
   teamRequired?: boolean
+  source: LoadSource
 }
 
 interface LaneRate {
@@ -40,18 +44,18 @@ interface LaneRate {
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 const LOADS: Load[] = [
-  { id:'1',  from:'Chicago',     fromState:'IL', to:'Dallas',        toState:'TX', miles:850,  rate:2.18, payout:1854,  type:'Dry Van',  weight:'42,000 lbs', pickup:'May 14', deliveryDate:'May 15', broker:'Echo Global',       brokerRating:4.6, brokerCredit:'A+', brokerPayDays:28, aiScore:98, dho:12,  status:'Hot',       age:'4 min',  ref:'EG-920441', commodity:'General Freight',   rateHistory:[2.05,2.10,2.12,2.15,2.18] },
-  { id:'2',  from:'Atlanta',     fromState:'GA', to:'Miami',         toState:'FL', miles:662,  rate:2.45, payout:1622,  type:'Reefer',   weight:'38,500 lbs', pickup:'May 14', deliveryDate:'May 15', broker:'Coyote Logistics',  brokerRating:4.8, brokerCredit:'A+', brokerPayDays:21, aiScore:94, dho:8,   status:'Available', age:'18 min', ref:'CL-773201', commodity:'Perishables',        rateHistory:[2.38,2.40,2.41,2.43,2.45] },
-  { id:'3',  from:'Houston',     fromState:'TX', to:'Phoenix',       toState:'AZ', miles:1201, rate:2.32, payout:2786,  type:'Flatbed',  weight:'44,000 lbs', pickup:'May 15', deliveryDate:'May 17', broker:'TQL',               brokerRating:4.4, brokerCredit:'A',  brokerPayDays:35, aiScore:91, dho:35,  status:'Available', age:'32 min', ref:'TQ-554832', commodity:'Steel Coil',         rateHistory:[2.20,2.24,2.28,2.30,2.32] },
-  { id:'4',  from:'Los Angeles', fromState:'CA', to:'Seattle',       toState:'WA', miles:1140, rate:2.71, payout:3090,  type:'Reefer',   weight:'40,000 lbs', pickup:'May 15', deliveryDate:'May 17', broker:'XPO Logistics',     brokerRating:4.7, brokerCredit:'A+', brokerPayDays:14, aiScore:89, dho:22,  status:'Available', age:'1 hr',   ref:'XP-211098', commodity:'Frozen Foods',        rateHistory:[2.60,2.63,2.66,2.68,2.71] },
-  { id:'5',  from:'Nashville',   fromState:'TN', to:'Charlotte',     toState:'NC', miles:408,  rate:1.95, payout:796,   type:'Dry Van',  weight:'35,000 lbs', pickup:'May 15', deliveryDate:'May 15', broker:'Arrive Logistics',  brokerRating:4.5, brokerCredit:'A',  brokerPayDays:28, aiScore:82, dho:45,  status:'Available', age:'2 hrs',  ref:'AL-887723', commodity:'Auto Parts',          rateHistory:[1.88,1.90,1.91,1.93,1.95] },
-  { id:'6',  from:'Denver',      fromState:'CO', to:'Salt Lake City',toState:'UT', miles:525,  rate:2.10, payout:1103,  type:'Dry Van',  weight:'39,000 lbs', pickup:'May 16', deliveryDate:'May 16', broker:'Worldwide Express', brokerRating:4.3, brokerCredit:'B+', brokerPayDays:42, aiScore:79, dho:60,  status:'Available', age:'3 hrs',  ref:'WE-334561', commodity:'Consumer Goods',      rateHistory:[2.05,2.06,2.07,2.09,2.10] },
-  { id:'7',  from:'Miami',       fromState:'FL', to:'New York',      toState:'NY', miles:1281, rate:2.55, payout:3267,  type:'Hotshot',  weight:'9,800 lbs',  pickup:'May 14', deliveryDate:'May 16', broker:'CH Robinson',       brokerRating:4.9, brokerCredit:'A+', brokerPayDays:21, aiScore:96, dho:5,   status:'Hot',       age:'8 min',  ref:'CH-990012', commodity:'Medical Supplies',    rateHistory:[2.45,2.48,2.50,2.52,2.55], hazmat:false },
-  { id:'8',  from:'Portland',    fromState:'OR', to:'San Francisco', toState:'CA', miles:636,  rate:2.38, payout:1514,  type:'Flatbed',  weight:'41,500 lbs', pickup:'May 16', deliveryDate:'May 17', broker:'Transplace',        brokerRating:4.6, brokerCredit:'A',  brokerPayDays:28, aiScore:85, dho:18,  status:'Available', age:'5 hrs',  ref:'TP-667214', commodity:'Construction',         rateHistory:[2.30,2.32,2.34,2.36,2.38] },
-  { id:'9',  from:'Dallas',      fromState:'TX', to:'Atlanta',       toState:'GA', miles:781,  rate:2.24, payout:1749,  type:'Dry Van',  weight:'40,000 lbs', pickup:'May 15', deliveryDate:'May 16', broker:'Echo Global',       brokerRating:4.6, brokerCredit:'A+', brokerPayDays:28, aiScore:88, dho:20,  status:'Available', age:'45 min', ref:'EG-884211', commodity:'General Freight',     rateHistory:[2.15,2.18,2.20,2.22,2.24] },
-  { id:'10', from:'Kansas City', fromState:'MO', to:'Memphis',       toState:'TN', miles:451,  rate:2.04, payout:921,   type:'Dry Van',  weight:'36,000 lbs', pickup:'May 16', deliveryDate:'May 16', broker:'Odyssey Logistics',  brokerRating:4.2, brokerCredit:'B+', brokerPayDays:35, aiScore:74, dho:55,  status:'Available', age:'6 hrs',  ref:'OD-441109', commodity:'Retail',              rateHistory:[1.95,1.98,2.00,2.02,2.04] },
-  { id:'11', from:'Denver',      fromState:'CO', to:'Chicago',       toState:'IL', miles:920,  rate:2.30, payout:2116,  type:'Reefer',   weight:'43,000 lbs', pickup:'May 17', deliveryDate:'May 19', broker:'Redwood Logistics',  brokerRating:4.5, brokerCredit:'A',  brokerPayDays:28, aiScore:87, dho:30,  status:'Available', age:'2 hrs',  ref:'RX-774211', commodity:'Dairy Products',      rateHistory:[2.20,2.23,2.25,2.27,2.30], teamRequired:true },
-  { id:'12', from:'Boston',      fromState:'MA', to:'Atlanta',       toState:'GA', miles:1103, rate:2.30, payout:2537,  type:'Dry Van',  weight:'40,000 lbs', pickup:'May 17', deliveryDate:'May 19', broker:'FreightWise',        brokerRating:4.6, brokerCredit:'A',  brokerPayDays:21, aiScore:90, dho:14,  status:'Available', age:'1 hr',   ref:'FW-228890', commodity:'Electronics',         rateHistory:[2.22,2.24,2.26,2.28,2.30] },
+  { id:'1',  from:'Chicago',     fromState:'IL', to:'Dallas',        toState:'TX', miles:850,  rate:2.18, payout:1854,  type:'Dry Van',  weight:'42,000 lbs', pickup:'May 14', deliveryDate:'May 15', broker:'Echo Global',       brokerRating:4.6, brokerCredit:'A+', brokerPayDays:28, aiScore:98, dho:12,  status:'Hot',       age:'4 min',  ref:'EG-920441', commodity:'General Freight',   rateHistory:[2.05,2.10,2.12,2.15,2.18], source:'123lb' },
+  { id:'2',  from:'Atlanta',     fromState:'GA', to:'Miami',         toState:'FL', miles:662,  rate:2.45, payout:1622,  type:'Reefer',   weight:'38,500 lbs', pickup:'May 14', deliveryDate:'May 15', broker:'Coyote Logistics',  brokerRating:4.8, brokerCredit:'A+', brokerPayDays:21, aiScore:94, dho:8,   status:'Available', age:'18 min', ref:'CL-773201', commodity:'Perishables',        rateHistory:[2.38,2.40,2.41,2.43,2.45], source:'123lb' },
+  { id:'3',  from:'Houston',     fromState:'TX', to:'Phoenix',       toState:'AZ', miles:1201, rate:2.32, payout:2786,  type:'Flatbed',  weight:'44,000 lbs', pickup:'May 15', deliveryDate:'May 17', broker:'TQL',               brokerRating:4.4, brokerCredit:'A',  brokerPayDays:35, aiScore:91, dho:35,  status:'Available', age:'32 min', ref:'TQ-554832', commodity:'Steel Coil',         rateHistory:[2.20,2.24,2.28,2.30,2.32], source:'123lb' },
+  { id:'4',  from:'Los Angeles', fromState:'CA', to:'Seattle',       toState:'WA', miles:1140, rate:2.71, payout:3090,  type:'Reefer',   weight:'40,000 lbs', pickup:'May 15', deliveryDate:'May 17', broker:'XPO Logistics',     brokerRating:4.7, brokerCredit:'A+', brokerPayDays:14, aiScore:89, dho:22,  status:'Available', age:'1 hr',   ref:'XP-211098', commodity:'Frozen Foods',        rateHistory:[2.60,2.63,2.66,2.68,2.71], source:'123lb' },
+  { id:'5',  from:'Nashville',   fromState:'TN', to:'Charlotte',     toState:'NC', miles:408,  rate:1.95, payout:796,   type:'Dry Van',  weight:'35,000 lbs', pickup:'May 15', deliveryDate:'May 15', broker:'Arrive Logistics',  brokerRating:4.5, brokerCredit:'A',  brokerPayDays:28, aiScore:82, dho:45,  status:'Available', age:'2 hrs',  ref:'AL-887723', commodity:'Auto Parts',          rateHistory:[1.88,1.90,1.91,1.93,1.95], source:'123lb' },
+  { id:'6',  from:'Denver',      fromState:'CO', to:'Salt Lake City',toState:'UT', miles:525,  rate:2.10, payout:1103,  type:'Dry Van',  weight:'39,000 lbs', pickup:'May 16', deliveryDate:'May 16', broker:'Worldwide Express', brokerRating:4.3, brokerCredit:'B+', brokerPayDays:42, aiScore:79, dho:60,  status:'Available', age:'3 hrs',  ref:'WE-334561', commodity:'Consumer Goods',      rateHistory:[2.05,2.06,2.07,2.09,2.10], source:'123lb' },
+  { id:'7',  from:'Miami',       fromState:'FL', to:'New York',      toState:'NY', miles:1281, rate:2.55, payout:3267,  type:'Hotshot',  weight:'9,800 lbs',  pickup:'May 14', deliveryDate:'May 16', broker:'CH Robinson',       brokerRating:4.9, brokerCredit:'A+', brokerPayDays:21, aiScore:96, dho:5,   status:'Hot',       age:'8 min',  ref:'CH-990012', commodity:'Medical Supplies',    rateHistory:[2.45,2.48,2.50,2.52,2.55], hazmat:false, source:'123lb' },
+  { id:'8',  from:'Portland',    fromState:'OR', to:'San Francisco', toState:'CA', miles:636,  rate:2.38, payout:1514,  type:'Flatbed',  weight:'41,500 lbs', pickup:'May 16', deliveryDate:'May 17', broker:'Transplace',        brokerRating:4.6, brokerCredit:'A',  brokerPayDays:28, aiScore:85, dho:18,  status:'Available', age:'5 hrs',  ref:'TP-667214', commodity:'Construction',         rateHistory:[2.30,2.32,2.34,2.36,2.38], source:'123lb' },
+  { id:'9',  from:'Dallas',      fromState:'TX', to:'Atlanta',       toState:'GA', miles:781,  rate:2.24, payout:1749,  type:'Dry Van',  weight:'40,000 lbs', pickup:'May 15', deliveryDate:'May 16', broker:'Echo Global',       brokerRating:4.6, brokerCredit:'A+', brokerPayDays:28, aiScore:88, dho:20,  status:'Available', age:'45 min', ref:'EG-884211', commodity:'General Freight',     rateHistory:[2.15,2.18,2.20,2.22,2.24], source:'123lb' },
+  { id:'10', from:'Kansas City', fromState:'MO', to:'Memphis',       toState:'TN', miles:451,  rate:2.04, payout:921,   type:'Dry Van',  weight:'36,000 lbs', pickup:'May 16', deliveryDate:'May 16', broker:'Odyssey Logistics',  brokerRating:4.2, brokerCredit:'B+', brokerPayDays:35, aiScore:74, dho:55,  status:'Available', age:'6 hrs',  ref:'OD-441109', commodity:'Retail',              rateHistory:[1.95,1.98,2.00,2.02,2.04], source:'123lb' },
+  { id:'11', from:'Denver',      fromState:'CO', to:'Chicago',       toState:'IL', miles:920,  rate:2.30, payout:2116,  type:'Reefer',   weight:'43,000 lbs', pickup:'May 17', deliveryDate:'May 19', broker:'Redwood Logistics',  brokerRating:4.5, brokerCredit:'A',  brokerPayDays:28, aiScore:87, dho:30,  status:'Available', age:'2 hrs',  ref:'RX-774211', commodity:'Dairy Products',      rateHistory:[2.20,2.23,2.25,2.27,2.30], teamRequired:true, source:'123lb' },
+  { id:'12', from:'Boston',      fromState:'MA', to:'Atlanta',       toState:'GA', miles:1103, rate:2.30, payout:2537,  type:'Dry Van',  weight:'40,000 lbs', pickup:'May 17', deliveryDate:'May 19', broker:'FreightWise',        brokerRating:4.6, brokerCredit:'A',  brokerPayDays:21, aiScore:90, dho:14,  status:'Available', age:'1 hr',   ref:'FW-228890', commodity:'Electronics',         rateHistory:[2.22,2.24,2.26,2.28,2.30], source:'123lb' },
 ]
 
 const LANE_RATES: LaneRate[] = [
@@ -229,9 +233,90 @@ export default function LoadBoardPage() {
   const [tab,          setTab]          = useState<'board' | 'watchlist' | 'market' | 'history' | 'auction'>('board')
   const [showFilters,  setShowFilters]  = useState(false)
   const [negotiateLoad, setNegotiateLoad] = useState<Load | null>(null)
+  const [sourceFilter, setSourceFilter] = useState<LoadSource | 'all'>('all')
+  const [ownLoads,     setOwnLoads]     = useState<Load[]>([])
 
-  const filtered = LOADS
+  // Fetch own loads from Supabase + realtime subscription
+  useEffect(() => {
+    supabase
+      .from('loads')
+      .select('*')
+      .eq('status', 'posted')
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        if (!data) return
+        type LoadRow = Database['public']['Tables']['loads']['Row']
+        setOwnLoads((data as LoadRow[]).map(row => ({
+          id:           row.id,
+          from:         row.origin_city,
+          fromState:    row.origin_state,
+          to:           row.destination_city,
+          toState:      row.destination_state,
+          miles:        row.miles ?? 500,
+          rate:         row.rate_per_mile ?? 0,
+          payout:       row.rate ?? 0,
+          type:         row.equipment_type,
+          weight:       row.weight_lbs ? `${Number(row.weight_lbs).toLocaleString()} lbs` : '—',
+          pickup:       row.pickup_date,
+          deliveryDate: row.delivery_date ?? '',
+          broker:       'Direct Shipper',
+          brokerRating: 5.0,
+          brokerCredit: 'A+' as const,
+          brokerPayDays: 0,
+          aiScore:      100,
+          dho:          0,
+          status:       'Hot' as const,
+          age:          'Just posted',
+          ref:          row.id.slice(0, 8).toUpperCase(),
+          commodity:    row.commodity,
+          rateHistory:  [],
+          source:       'own' as const,
+        })))
+      })
+
+    const sub = supabase
+      .channel('loads-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'loads' }, payload => {
+        type LoadRow = Database['public']['Tables']['loads']['Row']
+        const row = payload.new as LoadRow
+        setOwnLoads(prev => [{
+          id:           row.id,
+          from:         row.origin_city,
+          fromState:    row.origin_state,
+          to:           row.destination_city,
+          toState:      row.destination_state,
+          miles:        row.miles ?? 500,
+          rate:         row.rate_per_mile ?? 0,
+          payout:       row.rate ?? 0,
+          type:         row.equipment_type,
+          weight:       row.weight_lbs ? `${Number(row.weight_lbs).toLocaleString()} lbs` : '—',
+          pickup:       row.pickup_date,
+          deliveryDate: row.delivery_date ?? '',
+          broker:       'Direct Shipper',
+          brokerRating: 5.0,
+          brokerCredit: 'A+' as const,
+          brokerPayDays: 0,
+          aiScore:      100,
+          dho:          0,
+          status:       'Hot' as const,
+          age:          'Just posted',
+          ref:          row.id.slice(0, 8).toUpperCase(),
+          commodity:    row.commodity,
+          rateHistory:  [],
+          source:       'own' as const,
+        }, ...prev])
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(sub) }
+  }, [])
+
+  const allLoads = useMemo(() => [...ownLoads, ...LOADS], [ownLoads])
+
+  const filtered = allLoads
     .filter(l => {
+      if (sourceFilter !== 'all' && l.source !== sourceFilter) return false
       if (truckType !== 'All Types' && l.type   !== truckType) return false
       if (broker    !== 'All Brokers' && l.broker !== broker)  return false
       if (minRate   && l.rate < parseFloat(minRate))           return false
@@ -255,7 +340,7 @@ export default function LoadBoardPage() {
   const avgPayout = filtered.length ? Math.round(filtered.reduce((s,l) => s+l.payout, 0) / filtered.length) : 0
   const hotCount  = filtered.filter(l => l.status==='Hot').length
 
-  const watchedLoads = LOADS.filter(l => watchlist.has(l.id))
+  const watchedLoads = allLoads.filter(l => watchlist.has(l.id))
 
   function toggleWatch(id: string) {
     setWatchlist(prev => {
@@ -287,6 +372,36 @@ export default function LoadBoardPage() {
       {/* ── LOAD BOARD TAB ── */}
       {tab === 'board' && (
         <>
+          {/* Source selector */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
+            {[
+              { id: 'all',       label: 'All Sources',  icon: '🌐', count: allLoads.length,  color: '#1A2535' },
+              { id: 'own',       label: 'DispaLoadIQ',  icon: '💼', count: ownLoads.length,  color: '#38C770' },
+              { id: '123lb',     label: '123Loadboard', icon: '📦', count: LOADS.length,     color: '#3B82F6' },
+              { id: 'dat',       label: 'DAT',          icon: '🔷', count: 0,                color: '#F97316' },
+              { id: 'truckstop', label: 'Truckstop',    icon: '🚚', count: 0,                color: '#8B5CF6' },
+            ].map(src => (
+              <button key={src.id} onClick={() => setSourceFilter(src.id as LoadSource | 'all')} style={{
+                padding: '6px 14px', borderRadius: 20,
+                background: sourceFilter === src.id ? src.color : '#F7FAFC',
+                border: `1.5px solid ${sourceFilter === src.id ? src.color : '#E2E8F0'}`,
+                color: sourceFilter === src.id ? '#fff' : '#4A5568',
+                fontSize: 12, fontWeight: sourceFilter === src.id ? 700 : 500,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+              }}>
+                {src.icon} {src.label}
+                <span style={{
+                  background: sourceFilter === src.id ? 'rgba(255,255,255,.25)' : '#E2E8F0',
+                  padding: '1px 6px', borderRadius: 10, fontSize: 10, fontWeight: 700,
+                  color: sourceFilter === src.id ? '#fff' : '#718096',
+                }}>{src.count}</span>
+                {(src.id === 'dat' || src.id === 'truckstop') && src.count === 0 && (
+                  <span style={{ fontSize: 10, opacity: 0.7 }}>· Connect →</span>
+                )}
+              </button>
+            ))}
+          </div>
+
           {/* Search + Controls */}
           <div className="card" style={{ padding:'14px 16px' }}>
             <div style={{ display:'flex', gap:10, marginBottom: showFilters ? 14 : 0 }}>
@@ -487,7 +602,7 @@ export default function LoadBoardPage() {
       )}
 
       {/* ── HISTORY TAB ── */}
-      {tab === 'history' && <HistoryTab booked={booked} loads={LOADS} />}
+      {tab === 'history' && <HistoryTab booked={booked} loads={allLoads} />}
 
       {/* ── AUCTION TAB ── */}
       {tab === 'auction' && <AuctionTab />}
@@ -498,6 +613,14 @@ export default function LoadBoardPage() {
       )}
     </div>
   )
+}
+
+// ─── Source Badge config ──────────────────────────────────────────────────────
+const SOURCE_BADGE: Record<string, { icon: string; label: string; color: string; bg: string }> = {
+  own:       { icon: '💼', label: 'DispaLoadIQ', color: '#38C770', bg: '#F0FFF4' },
+  '123lb':   { icon: '📦', label: '123LB',       color: '#3B82F6', bg: '#EFF6FF' },
+  dat:       { icon: '🔷', label: 'DAT',         color: '#F97316', bg: '#FFF7ED' },
+  truckstop: { icon: '🚚', label: 'Truckstop',   color: '#8B5CF6', bg: '#F5F3FF' },
 }
 
 // ─── Load Card ────────────────────────────────────────────────────────────────
@@ -588,6 +711,17 @@ function LoadCard({ load: l, selected, booked, watched, onClick, onBook, onWatch
             <div style={{ fontSize:12, fontWeight:600 }}>{l.broker}</div>
             <div style={{ fontSize:10, color:'#718096' }}>★{l.brokerRating} · {l.brokerCredit} credit · {l.brokerPayDays}d pay</div>
           </div>
+          {SOURCE_BADGE[l.source] && (
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 99,
+              background: SOURCE_BADGE[l.source].bg,
+              color: SOURCE_BADGE[l.source].color,
+              border: `1px solid ${SOURCE_BADGE[l.source].color}40`,
+              marginLeft: 4,
+            }}>
+              {SOURCE_BADGE[l.source].icon} {SOURCE_BADGE[l.source].label}
+            </span>
+          )}
         </div>
         <div style={{ display:'flex', gap:6 }} onClick={e=>e.stopPropagation()}>
           <button className="btn btn-ghost btn-sm" style={{ fontSize:11 }} onClick={onNegotiate}>💬 Negotiate</button>

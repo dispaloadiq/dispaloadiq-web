@@ -2,12 +2,13 @@ import { useState } from 'react'
 import type { UserRole } from '../../types'
 import { useAuth } from '../../lib/AuthContext'
 
-interface Props { onLogin: (role: UserRole, name: string) => void }
+interface Props { onLogin: (role: UserRole, name: string, isNew?: boolean) => void }
 
 // ── Demo accounts — one click per role ───────────────────────────────────────
 const DEMO_ACCOUNTS: {
   role: UserRole; name: string; email: string
   icon: string; label: string; tagline: string; color: string; features: string[]
+  isNew?: boolean
 }[] = [
   {
     role: 'owner-op', name: 'Mike Rodriguez', email: 'mike@demo.com',
@@ -20,6 +21,13 @@ const DEMO_ACCOUNTS: {
     icon: '🧭', label: 'Dispatcher', tagline: 'Remote dispatcher · 4 clients',
     color: '#8B5CF6',
     features: ['Client Fleet Board', 'Commission Tracking', 'Hire Requests', 'Marketplace'],
+  },
+  {
+    role: 'dispatcher', name: 'Alex (New)', email: 'new-dispatcher@demo.com',
+    icon: '🆕', label: 'New Dispatcher', tagline: '0 clients · onboarding flow',
+    color: '#7C3AED',
+    features: ['Find Owner-Ops', 'Profile Builder', 'Proposal Flow', 'Locked Features'],
+    isNew: true,
   },
   {
     role: 'company', name: 'Irina Transport LLC', email: 'irina@demo.com',
@@ -80,7 +88,7 @@ export default function AuthPage({ onLogin }: Props) {
 
   // ── Demo quick-login (bypasses Supabase for instant preview) ─────────────
   const handleDemoLogin = (demo: typeof DEMO_ACCOUNTS[0]) => {
-    onLogin(demo.role, demo.name)
+    onLogin(demo.role, demo.name, demo.isNew)
   }
 
   const handleCreds = async (e: React.FormEvent) => {
@@ -91,7 +99,7 @@ export default function AuthPage({ onLogin }: Props) {
     if (tab === 'login') {
       // 1. Check demo accounts first (works without Supabase)
       const demo = DEMO_ACCOUNTS.find(d => d.email === email.toLowerCase())
-      if (demo) { onLogin(demo.role, demo.name); return }
+      if (demo) { onLogin(demo.role, demo.name, demo.isNew); return }
 
       // 2. Real Supabase sign-in
       setSubmitting(true)
@@ -334,7 +342,7 @@ export default function AuthPage({ onLogin }: Props) {
                 <div style={{ marginTop: 14, padding: '11px 14px', background: '#F0FFF4', borderRadius: 10, border: '1px solid #C6F6D5' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#276749', marginBottom: 4 }}>💡 Demo credentials (any password)</div>
                   <div style={{ fontSize: 10, color: '#2F855A', lineHeight: 1.7 }}>
-                    mike@demo.com · alex@demo.com<br />irina@demo.com · sarah@demo.com
+                    mike@demo.com · alex@demo.com · new-dispatcher@demo.com<br />irina@demo.com · sarah@demo.com
                   </div>
                 </div>
               )}

@@ -1,0 +1,19 @@
+.vercel
+
+# Environment variables — never commit these
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+dist/
+dist-ssr/
+
+# Editor
+.DS_Store
+*.local
+
+# Logs
+*.log
+npm-debug.log*

@@ -3,6 +3,25 @@
 
 export type UserRole = 'owner-op' | 'dispatcher' | 'company' | 'shipper'
 
+// ── Marketplace helper types ───────────────────────────────────────────────────
+export interface PortfolioLoad {
+  route: string
+  miles: number
+  rpm: number
+  equipment: string
+  date: string
+}
+
+export interface MessageMetadata {
+  load_id?: string
+  rate?: number
+  origin?: string
+  dest?: string
+  document_url?: string
+  document_name?: string
+  [key: string]: unknown
+}
+
 export type LoadStatus =
   | 'posted'
   | 'bidding'
@@ -352,6 +371,111 @@ export interface Database {
         Insert: Omit<Database['public']['Tables']['ai_conversations']['Row'], 'id' | 'created_at'>
         Update: never
       }
+
+      // ── Dispatcher Profiles (Marketplace) ─────────────────────────────────────
+      dispatcher_profiles: {
+        Row: {
+          user_id: string
+          bio: string | null
+          trust_score: number
+          verification_status: 'unverified' | 'pending' | 'verified' | 'certified'
+          languages: string[]
+          specialties: string[]
+          active_states: string[]
+          commission_rate: number
+          min_rpm: number
+          response_time_min: number
+          availability: 'available' | 'busy' | 'limited'
+          max_clients: number
+          current_clients: number
+          total_loads: number
+          avg_rpm: number
+          on_time_rate: number
+          client_retention: number
+          certifications: string[]
+          skills_score: number
+          english_score: number
+          identity_verified: boolean
+          portfolio_loads: PortfolioLoad[]
+          stripe_account_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['dispatcher_profiles']['Row'], 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['dispatcher_profiles']['Insert']>
+      }
+
+      // ── Conversations ─────────────────────────────────────────────────────────
+      conversations: {
+        Row: {
+          id: string
+          participant_a: string
+          participant_b: string
+          last_message: string | null
+          last_message_at: string | null
+          unread_a: number
+          unread_b: number
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['conversations']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['conversations']['Insert']>
+      }
+
+      // ── Messages ──────────────────────────────────────────────────────────────
+      messages: {
+        Row: {
+          id: string
+          conversation_id: string
+          sender_id: string
+          content: string
+          message_type: 'text' | 'load_share' | 'document' | 'system'
+          metadata: MessageMetadata | null
+          read: boolean
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['messages']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['messages']['Insert']>
+      }
+
+      // ── Dispatcher Relationships ──────────────────────────────────────────────
+      dispatcher_relationships: {
+        Row: {
+          id: string
+          owner_op_id: string
+          dispatcher_id: string
+          status: 'pending' | 'active' | 'paused' | 'terminated'
+          commission_rate: number
+          min_rpm_guarantee: number | null
+          contract_id: string | null
+          started_at: string | null
+          ended_at: string | null
+          total_loads: number
+          avg_rpm: number
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['dispatcher_relationships']['Row'], 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Database['public']['Tables']['dispatcher_relationships']['Insert']>
+      }
+
+      // ── Dispatcher Reviews ────────────────────────────────────────────────────
+      dispatcher_reviews: {
+        Row: {
+          id: string
+          dispatcher_id: string
+          reviewer_id: string
+          relationship_id: string | null
+          rating: number
+          text: string | null
+          loads_completed: number
+          avg_rpm_achieved: number | null
+          verified: boolean
+          created_at: string
+        }
+        Insert: Omit<Database['public']['Tables']['dispatcher_reviews']['Row'], 'id' | 'created_at'>
+        Update: Partial<Database['public']['Tables']['dispatcher_reviews']['Insert']>
+      }
     }
 
     Views: {
@@ -400,3 +524,17 @@ export type MaintenanceRecord  = Database['public']['Tables']['maintenance_recor
 export type Notification       = Database['public']['Tables']['notifications']['Row']
 export type Fleet              = Database['public']['Tables']['fleet']['Row']
 export type AIMessage          = Database['public']['Tables']['ai_conversations']['Row']
+
+// ── Marketplace convenience types ─────────────────────────────────────────────
+export type DispatcherProfile       = Database['public']['Tables']['dispatcher_profiles']['Row']
+export type DispatcherProfileInsert = Database['public']['Tables']['dispatcher_profiles']['Insert']
+export type Conversation            = Database['public']['Tables']['conversations']['Row']
+export type Message                 = Database['public']['Tables']['messages']['Row']
+export type MessageInsert           = Database['public']['Tables']['messages']['Insert']
+export type DispatcherRelationship  = Database['public']['Tables']['dispatcher_relationships']['Row']
+export type DispatcherReview        = Database['public']['Tables']['dispatcher_reviews']['Row']
+
+// ── Joined types (from Supabase select with relations) ─────────────────────────
+export type DispatcherProfileWithUser = DispatcherProfile & {
+  user_profiles: Pick<UserProfile, 'full_name' | 'avatar_url' | 'city' | 'state' | 'is_verified'>
+}

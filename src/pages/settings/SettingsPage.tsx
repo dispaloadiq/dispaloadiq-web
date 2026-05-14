@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useAuth } from '../../lib/AuthContext'
+import { useProfile, useUpdateProfile, useDispatcherProfileData, useUpdateDispatcherProfile } from '../../lib/hooks/useProfile'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type SettingsTab =
@@ -224,25 +226,89 @@ const ROLE_LABELS: Record<TeamRole, string> = {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
+  const { profile: authProfile } = useAuth()
+
+  // ── Real Supabase data ───────────────────────────────────────────────────────
+  const { data: userProfile, isLoading } = useProfile(authProfile?.id)
+  const { data: dispProfile } = useDispatcherProfileData(
+    authProfile?.role === 'dispatcher' ? authProfile?.id : undefined
+  )
+  const updateProfile    = useUpdateProfile()
+  const updateDispProfile = useUpdateDispatcherProfile()
+
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
   const [notifs, setNotifs]       = useState<NotifSetting[]>(NOTIF_DEFAULTS)
   const [templates, setTemplates] = useState<NotifTemplate[]>(NOTIF_TEMPLATES_DEFAULT)
-  const [saved, setSaved]         = useState(false)
+  const [toast, setToast]         = useState('')
+  const [saving, setSaving]       = useState(false)
+  /** @deprecated kept for notification template save UI compat */
+  const saved = toast.startsWith('Profile saved')
   const [showApiKey, setShowApiKey] = useState(false)
 
-  // Profile state
+  // ── Individual profile fields (synced from Supabase) ────────────────────────
+  const [name,     setName]     = useState(authProfile?.full_name     ?? 'Your Name')
+  const [email]                 = useState(authProfile?.email         ?? '')   // email is read-only
+  const [phone,    setPhone]    = useState(authProfile?.phone         ?? '(312) 555-0001')
+  const [city,     setCity]     = useState(authProfile?.city          ?? 'Chicago')
+  const [state,    setState]    = useState(authProfile?.state         ?? 'IL')
+  const [company,  setCompany]  = useState(authProfile?.company_name  ?? 'Your Company')
+  const [mcNumber, setMcNumber] = useState(authProfile?.mc_number     ?? 'MC-884291')
+  const [dotNumber,setDotNumber]= useState(authProfile?.dot_number    ?? 'DOT-3124881')
+  const [timezone, setTimezone] = useState('America/Chicago')
+  const [website,  setWebsite]  = useState('')
+
+  // Dispatcher-only fields
+  const [bio,            setBio]            = useState('')
+  const [commissionRate, setCommissionRate] = useState(8)
+  const [minRpm,         setMinRpm]         = useState(2.50)
+  const [availability,   setAvailability]   = useState<'available' | 'busy' | 'limited'>('available')
+
+  // Sync user profile from Supabase when it loads
+  useEffect(() => {
+    if (userProfile) {
+      setName(userProfile.full_name ?? 'Your Name')
+      setPhone(userProfile.phone ?? '(312) 555-0001')
+      setCity(userProfile.city ?? 'Chicago')
+      setState(userProfile.state ?? 'IL')
+      setCompany(userProfile.company_name ?? 'Your Company')
+      setMcNumber(userProfile.mc_number ?? 'MC-884291')
+      setDotNumber(userProfile.dot_number ?? 'DOT-3124881')
+    }
+  }, [userProfile])
+
+  // Sync dispatcher profile from Supabase when it loads
+  useEffect(() => {
+    if (dispProfile) {
+      setBio(dispProfile.bio ?? '')
+      setCommissionRate(dispProfile.commission_rate ?? 8)
+      setMinRpm(dispProfile.min_rpm ?? 2.50)
+      setAvailability(dispProfile.availability ?? 'available')
+    }
+  }, [dispProfile])
+
+  // Legacy profile object — kept so all existing UI references (p / setP) still work
   const [profile, setProfile] = useState({
-    name:     'Irina Kurali',
-    email:    'kuralinaira@gmail.com',
-    phone:    '(312) 555-0001',
-    company:  'Irina Transport LLC',
-    mc:       'MC-884291',
-    dot:      'DOT-3124881',
-    address:  'Chicago, IL 60601',
-    timezone: 'America/Chicago',
-    bio:      '',
-    website:  '',
+    name,
+    email,
+    phone,
+    company,
+    mc:       mcNumber,
+    dot:      dotNumber,
+    address:  `${city}, ${state}`,
+    timezone,
+    bio,
+    website,
   })
+
+  // Keep legacy profile object in sync with individual fields
+  useEffect(() => {
+    setProfile({
+      name, email, phone, company,
+      mc: mcNumber, dot: dotNumber,
+      address: `${city}, ${state}`,
+      timezone, bio, website,
+    })
+  }, [name, email, phone, company, mcNumber, dotNumber, city, state, timezone, bio, website])
 
   // Preferences state
   const [prefs, setPrefs] = useState({
@@ -286,9 +352,46 @@ export default function SettingsPage() {
     setNotifs(prev => prev.map(n => n.id === id ? { ...n, [channel]: !n[channel as keyof typeof n] } : n))
   }
 
-  function handleSave() {
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+  async function handleSave() {
+    if (!authProfile?.id) {
+      // Demo mode — no Supabase connected
+      setToast('Profile saved!')
+      setTimeout(() => setToast(''), 3000)
+      return
+    }
+    setSaving(true)
+    try {
+      await updateProfile.mutateAsync({
+        userId: authProfile.id,
+        updates: {
+          full_name:    name,
+          phone,
+          city,
+          state,
+          company_name: company,
+          mc_number:    mcNumber,
+          dot_number:   dotNumber,
+        },
+      })
+      if (authProfile.role === 'dispatcher') {
+        await updateDispProfile.mutateAsync({
+          userId: authProfile.id,
+          updates: {
+            bio,
+            commission_rate: commissionRate,
+            min_rpm:         minRpm,
+            availability,
+          },
+        })
+      }
+      setToast('Profile saved!')
+      setTimeout(() => setToast(''), 3000)
+    } catch {
+      setToast('Error saving profile')
+      setTimeout(() => setToast(''), 3000)
+    } finally {
+      setSaving(false)
+    }
   }
 
   function handleDeactivateMember(id: string) {
@@ -329,10 +432,57 @@ export default function SettingsPage() {
   ]
 
   const p    = (key: string) => (profile as Record<string, string>)[key] ?? ''
-  const setP = (key: string, val: string) => setProfile(prev => ({ ...prev, [key]: val }))
+  const setP = (key: string, val: string) => {
+    // Keep legacy profile object in sync (drives display), then sync individual fields
+    setProfile(prev => ({ ...prev, [key]: val }))
+    if (key === 'name')    setName(val)
+    if (key === 'phone')   setPhone(val)
+    if (key === 'company') setCompany(val)
+    if (key === 'mc')      setMcNumber(val)
+    if (key === 'dot')     setDotNumber(val)
+    if (key === 'bio')     setBio(val)
+    if (key === 'address') {
+      // Parse "City, ST" format
+      const parts = val.split(',')
+      if (parts.length >= 2) {
+        setCity(parts[0].trim())
+        setState(parts[1].trim())
+      } else {
+        setCity(val)
+      }
+    }
+    if (key === 'timezone') setTimezone(val)
+    if (key === 'website')  setWebsite(val)
+  }
+
+  // ── Loading skeleton ────────────────────────────────────────────────────────
+  if (isLoading && authProfile?.id) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 300 }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 40, height: 40, border: '3px solid #E2E8F0', borderTopColor: '#4BAED4', borderRadius: '50%', margin: '0 auto 12px', animation: 'spin 0.8s linear infinite' }} />
+          <div style={{ fontSize: 13, color: '#718096', fontWeight: 600 }}>Загрузка профиля...</div>
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+      </div>
+    )
+  }
 
   return (
-    <div style={{ display: 'flex', gap: 24, maxWidth: 1060 }}>
+    <div style={{ display: 'flex', gap: 24, maxWidth: 1060, position: 'relative' }}>
+
+      {/* ── Toast notification ───────────────────────────── */}
+      {toast && (
+        <div style={{
+          position: 'fixed', bottom: 32, right: 32, zIndex: 9999,
+          background: toast.startsWith('Error') ? '#C53030' : '#276749',
+          color: '#fff', padding: '12px 22px', borderRadius: 12,
+          fontWeight: 700, fontSize: 14, boxShadow: '0 4px 20px rgba(0,0,0,.18)',
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          {toast.startsWith('Error') ? '✕' : '✓'} {toast}
+        </div>
+      )}
 
       {/* ── Sidebar nav ─────────────────────────────────── */}
       <div style={{ width: 214, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -464,8 +614,8 @@ export default function SettingsPage() {
               <button style={{ padding: '10px 20px', background: '#F7FAFC', color: '#718096', border: '1px solid #E2E8F0', borderRadius: 10, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
                 Отменить
               </button>
-              <button onClick={handleSave} style={{ padding: '10px 24px', background: saved ? '#48BB78' : '#4BAED4', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', minWidth: 150, transition: 'background .2s' }}>
-                {saved ? '✓ Сохранено!' : 'Сохранить изменения'}
+              <button onClick={() => { void handleSave() }} disabled={saving} style={{ padding: '10px 24px', background: toast === 'Profile saved!' ? '#48BB78' : '#4BAED4', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: saving ? 'not-allowed' : 'pointer', minWidth: 150, transition: 'background .2s', opacity: saving ? 0.7 : 1 }}>
+                {saving ? 'Сохранение...' : toast === 'Profile saved!' ? '✓ Сохранено!' : 'Сохранить изменения'}
               </button>
             </div>
           </>
@@ -563,7 +713,7 @@ export default function SettingsPage() {
                           />
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
-                          <button onClick={() => handleSave()} style={{ padding: '8px 18px', background: saved ? '#48BB78' : '#4BAED4', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
+                          <button onClick={() => { void handleSave() }} style={{ padding: '8px 18px', background: saved ? '#48BB78' : '#4BAED4', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>
                             {saved ? '✓ Сохранено' : 'Сохранить шаблон'}
                           </button>
                           <button style={{ padding: '8px 14px', background: '#F7FAFC', color: '#718096', border: '1px solid #E2E8F0', borderRadius: 8, fontSize: 12, cursor: 'pointer' }}>
@@ -578,7 +728,7 @@ export default function SettingsPage() {
             </SectionCard>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={handleSave} style={{ padding: '10px 24px', background: saved ? '#48BB78' : '#4BAED4', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'background .2s' }}>
+              <button onClick={() => { void handleSave() }} style={{ padding: '10px 24px', background: saved ? '#48BB78' : '#4BAED4', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'background .2s' }}>
                 {saved ? '✓ Сохранено!' : 'Сохранить настройки'}
               </button>
             </div>
@@ -763,7 +913,7 @@ export default function SettingsPage() {
             </SectionCard>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={handleSave} style={{ padding: '10px 24px', background: saved ? '#48BB78' : '#4BAED4', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'background .2s' }}>
+              <button onClick={() => { void handleSave() }} style={{ padding: '10px 24px', background: saved ? '#48BB78' : '#4BAED4', color: '#fff', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'background .2s' }}>
                 {saved ? '✓ Сохранено!' : 'Сохранить настройки'}
               </button>
             </div>

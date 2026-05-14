@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useAuth } from '../../lib/AuthContext'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type RequestStatus = 'pending' | 'accepted' | 'declined' | 'trial'
@@ -526,10 +527,14 @@ function MessageModal({ name, onClose }: { name: string; onClose: () => void }) 
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function DispatcherProfilePage() {
+  const { profile: authProfile } = useAuth()
   const [tab, setTab] = useState<'requests' | 'clients' | 'earnings' | 'profile'>('requests')
   const [requests, setRequests] = useState<HireRequest[]>(REQUESTS)
   const [available, setAvailable] = useState(true)
-  const [profile, setProfile] = useState<ProfileData>(INIT_PROFILE)
+  const [profile, setProfile] = useState<ProfileData>({
+    ...INIT_PROFILE,
+    displayName: authProfile?.full_name ?? INIT_PROFILE.displayName,
+  })
   const [showEditModal, setShowEditModal] = useState(false)
   const [msgTarget, setMsgTarget] = useState<{ name: string } | null>(null)
 

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import BookLoadModal, { type BookableClient } from '../../components/BookLoadModal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ClientStatus = 'Active' | 'Pending' | 'Inactive' | 'New'
@@ -904,6 +905,7 @@ export default function ClientsPage() {
   const [activeTab, setActiveTab]         = useState<DetailTab>('overview')
   const [sortBy, setSortBy]               = useState<'revenue' | 'rpm' | 'loads'>('revenue')
   const [selectedClients, setSelectedClients] = useState<Set<string>>(new Set())
+  const [bookingClient, setBookingClient] = useState<BookableClient | null>(null)
 
   const selectedClient = CLIENTS.find(c => c.id === selectedId)
 
@@ -1247,7 +1249,18 @@ export default function ClientsPage() {
                   </div>
 
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button className="btn btn-primary" style={{ flex: 1 }}>📦 Find Load</button>
+                    <button
+                      className="btn btn-primary"
+                      style={{ flex: 1 }}
+                      onClick={() => setBookingClient({
+                        id: selectedClient.id,
+                        name: selectedClient.name,
+                        equipment: selectedClient.truckType,
+                        rpmGuarantee: selectedClient.rpmNum,
+                        commissionPct: 8,
+                        preferredLanes: selectedClient.lanes.join(', '),
+                      })}
+                    >📦 Find Load</button>
                     <button className="btn btn-secondary" style={{ flex: 1 }}>💬 Message</button>
                     <button className="btn btn-secondary" style={{ flex: 1 }}>📊 Report</button>
                   </div>
@@ -1337,6 +1350,16 @@ export default function ClientsPage() {
       </div>
 
       {showAddModal && <AddClientModal onClose={() => setShowAddModal(false)} />}
+      {bookingClient && (
+        <BookLoadModal
+          client={bookingClient}
+          onClose={() => setBookingClient(null)}
+          onBooked={(loadId, clientId) => {
+            console.log(`Booked load ${loadId} for client ${clientId}`)
+            setBookingClient(null)
+          }}
+        />
+      )}
     </div>
   )
 }

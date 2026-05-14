@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { supabase } from '../../lib/supabase'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type Step = 1 | 2 | 3 | 4
@@ -967,7 +968,25 @@ export default function PostLoadPage({ onNavigate }: { onNavigate: (p: string) =
               </button>
             ) : (
               <button className="btn btn-primary" style={{ minWidth: 160 }}
-                onClick={() => setSubmitted(true)}>
+                onClick={async () => {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const { error } = await (supabase as any).from('loads').insert({
+                    shipper_id: '00000000-0000-0000-0000-000000000000',
+                    origin_city: origin.city,
+                    origin_state: origin.state,
+                    destination_city: dest.city,
+                    destination_state: dest.state,
+                    pickup_date: origin.date || null,
+                    delivery_date: dest.date || null,
+                    commodity: form.commodity || null,
+                    weight_lbs: form.weight ? parseFloat(form.weight) : null,
+                    equipment_type: form.truckType || null,
+                    rate: form.budget ? parseFloat(form.budget) : null,
+                    status: 'posted',
+                  })
+                  if (error) console.error('PostLoad Supabase error:', error)
+                  setSubmitted(true)
+                }}>
                 🚀 Post Load Now
               </button>
             )}

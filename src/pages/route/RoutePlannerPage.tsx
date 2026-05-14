@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import MapView, { type RouteWaypoint as MapRouteWaypoint } from '../../components/MapView'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Waypoint {
@@ -296,6 +297,83 @@ const STATE_POS: Record<string, [number, number]> = {
   IN:[61,28],OH:[66,26],KY:[63,36],TN:[62,44],MS:[58,54],AL:[63,56],GA:[67,56],FL:[69,68],
   SC:[72,48],NC:[71,42],VA:[73,36],WV:[69,33],PA:[72,26],NY:[77,20],VT:[81,14],ME:[85,11],
   NH:[83,16],MA:[83,22],CT:[82,25],NJ:[79,28],DE:[78,32],MD:[76,33],
+}
+
+// ── City → lat/lng lookup for Google Maps ─────────────────────────────────────
+const CITY_COORDS: Record<string, { lat: number; lng: number }> = {
+  // Major hubs
+  'Chicago IL':        { lat: 41.878, lng: -87.630 },
+  'Dallas TX':         { lat: 32.776, lng: -96.797 },
+  'Atlanta GA':        { lat: 33.749, lng: -84.388 },
+  'Los Angeles CA':    { lat: 34.052, lng: -118.244 },
+  'Phoenix AZ':        { lat: 33.448, lng: -112.074 },
+  'Miami FL':          { lat: 25.761, lng: -80.192 },
+  'New York NY':       { lat: 40.713, lng: -74.006 },
+  'Houston TX':        { lat: 29.760, lng: -95.369 },
+  'Seattle WA':        { lat: 47.608, lng: -122.335 },
+  'Denver CO':         { lat: 39.739, lng: -104.984 },
+  'Kansas City MO':    { lat: 39.099, lng: -94.579 },
+  'Memphis TN':        { lat: 35.150, lng: -90.048 },
+  'Nashville TN':      { lat: 36.174, lng: -86.767 },
+  'Charlotte NC':      { lat: 35.227, lng: -80.843 },
+  'Indianapolis IN':   { lat: 39.768, lng: -86.158 },
+  'Columbus OH':       { lat: 39.961, lng: -82.999 },
+  'Louisville KY':     { lat: 38.252, lng: -85.758 },
+  'St. Louis MO':      { lat: 38.627, lng: -90.197 },
+  'Minneapolis MN':    { lat: 44.980, lng: -93.265 },
+  'Detroit MI':        { lat: 42.331, lng: -83.046 },
+  'Philadelphia PA':   { lat: 39.952, lng: -75.164 },
+  'San Antonio TX':    { lat: 29.424, lng: -98.494 },
+  'San Diego CA':      { lat: 32.716, lng: -117.161 },
+  'San Francisco CA':  { lat: 37.774, lng: -122.419 },
+  'Portland OR':       { lat: 45.523, lng: -122.676 },
+  'Salt Lake City UT': { lat: 40.760, lng: -111.891 },
+  'Albuquerque NM':    { lat: 35.085, lng: -106.650 },
+  'El Paso TX':        { lat: 31.758, lng: -106.488 },
+  'Omaha NE':          { lat: 41.257, lng: -95.938 },
+  'Oklahoma City OK':  { lat: 35.468, lng: -97.516 },
+  'Jacksonville FL':   { lat: 30.332, lng: -81.656 },
+  'Tampa FL':          { lat: 27.948, lng: -82.459 },
+  'Baltimore MD':      { lat: 39.290, lng: -76.612 },
+  'Las Vegas NV':      { lat: 36.175, lng: -115.136 },
+  'Tucson AZ':         { lat: 32.222, lng: -110.975 },
+  'Fresno CA':         { lat: 36.740, lng: -119.785 },
+  'Sacramento CA':     { lat: 38.581, lng: -121.494 },
+  'Boston MA':         { lat: 42.360, lng: -71.059 },
+  'Pittsburgh PA':     { lat: 40.440, lng: -79.996 },
+  'Cincinnati OH':     { lat: 39.103, lng: -84.512 },
+  'Cleveland OH':      { lat: 41.500, lng: -81.695 },
+  'Milwaukee WI':      { lat: 43.039, lng: -87.907 },
+  'Raleigh NC':        { lat: 35.779, lng: -78.638 },
+  'Richmond VA':       { lat: 37.541, lng: -77.434 },
+  'Baton Rouge LA':    { lat: 30.451, lng: -91.154 },
+  'New Orleans LA':    { lat: 29.951, lng: -90.072 },
+  'Tulsa OK':          { lat: 36.154, lng: -95.993 },
+  'Wichita KS':        { lat: 37.688, lng: -97.336 },
+  'Des Moines IA':     { lat: 41.600, lng: -93.609 },
+  'Little Rock AR':    { lat: 34.746, lng: -92.289 },
+  'Birmingham AL':     { lat: 33.521, lng: -86.803 },
+  'Jackson MS':        { lat: 32.298, lng: -90.184 },
+  'Shreveport LA':     { lat: 32.525, lng: -93.750 },
+}
+
+function toMapWaypoints(wps: Waypoint[]): MapRouteWaypoint[] {
+  return wps
+    .filter(wp => wp.city && wp.state)
+    .map(wp => {
+      const key = `${wp.city} ${wp.state}`
+      const coords = CITY_COORDS[key] ?? null
+      if (!coords) return null
+      return { lat: coords.lat, lng: coords.lng, label: `${wp.city}, ${wp.state}`, type: wp.type } as MapRouteWaypoint
+    })
+    .filter((w): w is MapRouteWaypoint => w !== null)
+}
+
+function getMapCenter(wps: MapRouteWaypoint[]): { lat: number; lng: number } {
+  if (wps.length === 0) return { lat: 39.5, lng: -98.35 }
+  const lat = wps.reduce((s, w) => s + w.lat, 0) / wps.length
+  const lng = wps.reduce((s, w) => s + w.lng, 0) / wps.length
+  return { lat, lng }
 }
 
 function RouteMap({ waypoints, compareWaypoints }: { waypoints: Waypoint[]; compareWaypoints?: Waypoint[] }) {
@@ -779,8 +857,22 @@ export default function RoutePlannerPage() {
           )}
 
           {/* Map showing both routes */}
-          <div className="card" style={{ padding: 0, height: 300, overflow: 'hidden', position: 'relative' }}>
-            <RouteMap waypoints={waypoints} compareWaypoints={compareWaypoints} />
+          <div style={{ borderRadius: 12, overflow: 'hidden' }}>
+            {(() => {
+              const mapWpsA = toMapWaypoints(waypoints)
+              const mapWpsB = toMapWaypoints(compareWaypoints)
+              const allWps = [...mapWpsA, ...mapWpsB]
+              return (
+                <MapView
+                  height={300}
+                  center={getMapCenter(allWps.length ? allWps : mapWpsA)}
+                  zoom={4}
+                  waypoints={mapWpsA}
+                  useDirections={mapWpsA.length >= 2}
+                  dark={false}
+                />
+              )
+            })()}
           </div>
         </div>
       )}
@@ -929,12 +1021,25 @@ export default function RoutePlannerPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
             {/* Map */}
-            <div className="card" style={{ padding: 0, overflow: 'hidden', height: 300, position: 'relative' }}>
-              <RouteMap waypoints={waypoints} />
+            <div style={{ borderRadius: 12, overflow: 'hidden', position: 'relative' }}>
+              {(() => {
+                const mapWps = toMapWaypoints(waypoints)
+                return (
+                  <MapView
+                    height={300}
+                    center={getMapCenter(mapWps)}
+                    zoom={mapWps.length >= 2 ? 5 : 4}
+                    waypoints={mapWps}
+                    useDirections={calculated && mapWps.length >= 2}
+                    dark={false}
+                  />
+                )
+              })()}
               {!calculated && (
                 <div style={{
                   position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', background: 'rgba(235,244,248,.7)',
+                  justifyContent: 'center', background: 'rgba(235,244,248,.65)',
+                  borderRadius: 12,
                 }}>
                   <div style={{ textAlign: 'center', color: '#718096' }}>
                     <div style={{ fontSize: 36, marginBottom: 8 }}>🗺️</div>
