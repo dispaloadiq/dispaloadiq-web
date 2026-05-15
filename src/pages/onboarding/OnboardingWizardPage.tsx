@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { UserRole } from '../../types';
+import { supabase } from '../../lib/supabase';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -1205,6 +1206,7 @@ function CompletionScreen({
           40% { opacity: 1; transform: translateY(0) scale(1.2); }
           100% { transform: translateY(10px) scale(1); opacity: 0.7; }
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>
 
       <div style={{ fontSize: 72, marginBottom: 16, position: 'relative', zIndex: 1 }}>🎉</div>
@@ -1267,10 +1269,14 @@ function CompletionScreen({
 export default function OnboardingWizardPage({
   role,
   userName,
+  userId,
+  userEmail,
   onComplete,
 }: {
   role: UserRole;
   userName: string;
+  userId?: string;
+  userEmail?: string;
   onComplete: () => void;
 }) {
   const steps = STEPS_BY_ROLE[role];
@@ -1278,26 +1284,63 @@ export default function OnboardingWizardPage({
 
   const [currentStep, setCurrentStep] = useState(1);
   const [completed, setCompleted] = useState(false);
-  const [form, setForm] = useState<FormData>(INITIAL_FORM);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [form, setForm] = useState<FormData>({
+    ...INITIAL_FORM,
+    fullName: userName || '',
+    email: userEmail || '',
+  });
   const [autoSaved, setAutoSaved] = useState(false);
 
   const setField = (key: keyof FormData, value: unknown) => {
     setForm(prev => ({ ...prev, [key]: value }));
-    // Trigger auto-save badge
     setAutoSaved(true);
     setTimeout(() => setAutoSaved(false), 2000);
   };
 
   const progressPct = completed ? 100 : Math.round(((currentStep - 1) / totalSteps) * 100);
 
-  const goNext = () => {
-    if (currentStep < totalSteps) setCurrentStep(s => s + 1);
-    else setCompleted(true);
+  const goNext = async () => {
+    if (currentStep < totalSteps) {
+      setCurrentStep(s => s + 1);
+      return;
+    }
+    // Last step → save profile to Supabase if we have a userId
+    if (userId) {
+      setSaving(true);
+      setSaveError(null);
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (supabase.from('user_profiles') as any).upsert({
+          id: userId,
+          role,
+          full_name: form.fullName || userName || 'New User',
+          email: userEmail || form.email || '',
+          phone: form.phone || null,
+          company_name: form.companyName || null,
+          mc_number: form.mcNumber || form.companyMc || null,
+          dot_number: form.dotNumber || form.companyDot || null,
+          state: form.homeState || form.hqState || null,
+          equipment_types: form.preferredLoadTypes.length > 0 ? form.preferredLoadTypes : [],
+          is_verified: false,
+          subscription_tier: 'free',
+        });
+        if (error) throw error;
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setSaveError(msg);
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+    }
+    setCompleted(true);
   };
   const goBack = () => {
     if (currentStep > 1) setCurrentStep(s => s - 1);
   };
-  const skip = () => goNext();
+  const skip = async () => { await goNext(); };
 
   // ── Step content renderer
   const renderStep = () => {
@@ -1541,19 +1584,45 @@ export default function OnboardingWizardPage({
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={goNext}
-              style={{
-                padding: '10px 32px', borderRadius: 8, border: 'none',
-                background: `linear-gradient(135deg, ${PRIMARY}, #2E86B5)`,
-                color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer',
-                boxShadow: `0 2px 12px ${PRIMARY}50`,
-                transition: 'transform 0.15s, box-shadow 0.15s',
-              }}
-            >
-              {currentStep === totalSteps ? '🎉 Finish Setup' : 'Next →'}
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+              {saveError && (
+                <div style={{
+                  fontSize: 12, color: '#DC2626', background: '#FEF2F2',
+                  border: '1px solid #FECACA', borderRadius: 6, padding: '6px 12px',
+                  maxWidth: 320, textAlign: 'right',
+                }}>
+                  ❌ {saveError}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={saving}
+                style={{
+                  padding: '10px 32px', borderRadius: 8, border: 'none',
+                  background: `linear-gradient(135deg, ${PRIMARY}, #2E86B5)`,
+                  color: '#fff', fontWeight: 700, fontSize: 14,
+                  cursor: saving ? 'not-allowed' : 'pointer',
+                  boxShadow: `0 2px 12px ${PRIMARY}50`,
+                  opacity: saving ? 0.75 : 1,
+                  transition: 'transform 0.15s, box-shadow 0.15s',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                }}
+              >
+                {saving ? (
+                  <>
+                    <span style={{
+                      width: 14, height: 14,
+                      border: '2px solid rgba(255,255,255,.4)',
+                      borderTopColor: '#fff', borderRadius: '50%',
+                      display: 'inline-block',
+                      animation: 'spin .7s linear infinite',
+                    }} />
+                    Saving...
+                  </>
+                ) : currentStep === totalSteps ? '🎉 Finish Setup' : 'Next →'}
+              </button>
+            </div>
           </div>
         )}
       </div>

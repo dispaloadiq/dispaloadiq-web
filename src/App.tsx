@@ -199,7 +199,7 @@ function PageContent({ role, page, userName, onNavigate, dispatcherIsNew }: { ro
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const { profile, user, loading, signOut } = useAuth()
+  const { profile, user, loading, signOut, refreshProfile } = useAuth()
   const [page, setPage] = useState('dashboard')
 
   // Demo fallback: when no Supabase session, store role locally
@@ -223,7 +223,6 @@ export default function App() {
   }
 
   // Not authenticated — show auth page only if no Supabase session AND no demo role
-  // If user has a Supabase session (user != null) but profile row is missing, still let them in
   if (!profile && !demoRole && !user) {
     return (
       <AuthPage
@@ -232,6 +231,23 @@ export default function App() {
           setDemoName(name)
           setDispatcherIsNew(role === 'dispatcher' && (isNew ?? false))
           setPage('dashboard')
+        }}
+      />
+    )
+  }
+
+  // User is authenticated but has no profile row yet → onboarding to create it
+  if (user && !profile && !demoRole) {
+    const metaRole: UserRole = (user.user_metadata?.role as UserRole) ?? 'owner-op'
+    const metaName: string = user.user_metadata?.full_name ?? user.email?.split('@')[0] ?? ''
+    return (
+      <OnboardingWizardPage
+        role={metaRole}
+        userName={metaName}
+        userId={user.id}
+        userEmail={user.email ?? ''}
+        onComplete={async () => {
+          await refreshProfile()
         }}
       />
     )
