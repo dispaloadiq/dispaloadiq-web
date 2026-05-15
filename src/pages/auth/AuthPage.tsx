@@ -5,6 +5,36 @@ import { useAuth } from '../../lib/AuthContext'
 interface Props { onLogin: (role: UserRole, name: string, isNew?: boolean) => void }
 
 // ── Demo accounts — one click per role ───────────────────────────────────────
+// Roles shown during registration (4 unique roles only)
+const REGISTER_ROLES: {
+  role: UserRole; icon: string; label: string; tagline: string; color: string; features: string[]
+}[] = [
+  {
+    role: 'owner-op',
+    icon: '🚛', label: 'Owner-Operator', tagline: 'Solo driver or small fleet',
+    color: '#4BAED4',
+    features: ['AI Load Board', 'Trip TMS', 'IFTA Reports'],
+  },
+  {
+    role: 'dispatcher',
+    icon: '🧭', label: 'Dispatcher', tagline: 'Remote dispatcher for owner-ops',
+    color: '#8B5CF6',
+    features: ['Client Fleet Board', 'Commission Tracking', 'Marketplace'],
+  },
+  {
+    role: 'company',
+    icon: '🏢', label: 'Transport Company', tagline: 'Fleet owner · multiple trucks',
+    color: '#059669',
+    features: ['Fleet TMS', 'Driver Payroll', 'Customer CRM'],
+  },
+  {
+    role: 'shipper',
+    icon: '📦', label: 'Shipper', tagline: 'Freight shipper · post loads',
+    color: '#D97706',
+    features: ['Post Loads', 'Track Shipments', 'Find Carriers'],
+  },
+]
+
 const DEMO_ACCOUNTS: {
   role: UserRole; name: string; email: string
   icon: string; label: string; tagline: string; color: string; features: string[]
@@ -389,7 +419,7 @@ export default function AuthPage({ onLogin }: Props) {
               <p style={{ fontSize: 13, color: '#718096', marginBottom: 20 }}>Your role personalises the entire platform</p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginBottom: 20 }}>
-                {DEMO_ACCOUNTS.map(d => (
+                {REGISTER_ROLES.map(d => (
                   <button key={d.role} onClick={() => setSelectedRole(d.role)} style={{
                     display: 'flex', alignItems: 'center', gap: 14, padding: '13px 16px', borderRadius: 12,
                     cursor: 'pointer', textAlign: 'left',
