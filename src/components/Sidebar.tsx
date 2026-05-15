@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { UserRole } from '../types'
+import { useModules, CORE_PAGES } from '../lib/useModules'
 
 interface NavItem {
   icon: string
@@ -362,20 +363,36 @@ interface Props {
   role: UserRole
   activePage: string
   userName: string
+  userId?: string
   onNavigate: (page: string) => void
   onLogout: () => void
   dispatcherIsNew?: boolean
 }
 
-export default function Sidebar({ role, activePage, userName, onNavigate, onLogout, dispatcherIsNew }: Props) {
+export default function Sidebar({ role, activePage, userName, userId, onNavigate, onLogout, dispatcherIsNew }: Props) {
   const isDispatcher = role === 'dispatcher'
-  const sections = (isDispatcher && dispatcherIsNew) ? DISPATCHER_NEW_SECTIONS : ROLE_SECTIONS[role]
+  const allSections = (isDispatcher && dispatcherIsNew) ? DISPATCHER_NEW_SECTIONS : ROLE_SECTIONS[role]
   const defaultCollapsed = (isDispatcher && dispatcherIsNew)
     ? ['LOCKED — UNLOCKS WITH FIRST CLIENT']
     : (DEFAULT_COLLAPSED[role] ?? [])
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
     new Set(defaultCollapsed)
   )
+
+  // Progressive modules — filter nav items to only enabled ones (or all for demo)
+  const { isEnabled } = useModules(userId || `demo_${role}`, role)
+  // When a real userId exists, filter; for demo mode show everything
+  const filterItems = !!userId
+  const sections = filterItems
+    ? allSections
+        .map(s => ({
+          ...s,
+          items: s.items.filter(item =>
+            CORE_PAGES.has(item.page) || item.label.startsWith('🔒') || isEnabled(item.page)
+          ),
+        }))
+        .filter(s => s.items.length > 0)
+    : allSections
 
   function toggleSection(title: string) {
     setCollapsedSections(prev => {
@@ -478,6 +495,25 @@ export default function Sidebar({ role, activePage, userName, onNavigate, onLogo
           )
         })}
       </div>
+
+      {/* Add Modules button */}
+      <button
+        onClick={() => onNavigate('modules')}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          width: '100%', padding: '10px 20px',
+          background: 'none', border: 'none', cursor: 'pointer',
+          borderTop: '1px solid rgba(255,255,255,.07)',
+          color: isDispatcher ? 'rgba(167,139,250,.7)' : 'rgba(75,174,212,.7)',
+          fontSize: 12, fontWeight: 700,
+          transition: 'color .15s',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.color = isDispatcher ? '#A78BFA' : '#4BAED4')}
+        onMouseLeave={e => (e.currentTarget.style.color = isDispatcher ? 'rgba(167,139,250,.7)' : 'rgba(75,174,212,.7)')}
+      >
+        <span style={{ fontSize: 15 }}>＋</span>
+        <span>Add Modules</span>
+      </button>
 
       {/* Footer */}
       <div className="sidebar-footer">

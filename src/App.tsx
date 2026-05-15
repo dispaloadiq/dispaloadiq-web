@@ -84,6 +84,7 @@ import DispatcherWorkspacePage     from './pages/dispatcher/DispatcherWorkspaceP
 import EarningsCalculatorPage      from './pages/dispatcher/EarningsCalculatorPage'
 import DispatcherPublicProfilePage from './pages/dispatcher/DispatcherPublicProfilePage'
 import GrowthReferralPage          from './pages/growth/GrowthReferralPage'
+import ModulesPage                from './pages/modules/ModulesPage'
 
 // ── Placeholder pages ─────────────────────────────────────────────────────────
 function Placeholder({ title, icon }: { title: string; icon: string }) {
@@ -97,7 +98,7 @@ function Placeholder({ title, icon }: { title: string; icon: string }) {
 }
 
 // ── Page router ───────────────────────────────────────────────────────────────
-function PageContent({ role, page, userName, onNavigate, dispatcherIsNew }: { role: UserRole; page: string; userName: string; onNavigate: (p: string) => void; dispatcherIsNew: boolean }) {
+function PageContent({ role, page, userName, userId, onNavigate, dispatcherIsNew }: { role: UserRole; page: string; userName: string; userId: string; onNavigate: (p: string) => void; dispatcherIsNew: boolean }) {
   // ── Shared pages (available to all roles) ──────────────────────────────────
   if (page === 'marketplace') return <DispatcherMarketplace />
   if (page === 'loads')       return <LoadBoardPage />
@@ -174,6 +175,7 @@ function PageContent({ role, page, userName, onNavigate, dispatcherIsNew }: { ro
   if (page === 'earnings-calculator')  return <EarningsCalculatorPage />
   if (page === 'public-profile')       return <DispatcherPublicProfilePage />
   if (page === 'referral')             return <GrowthReferralPage />
+  if (page === 'modules')             return <ModulesPage role={role} userId={userId} />
 
   // ── Role-specific dashboards ───────────────────────────────────────────────
   switch (role) {
@@ -270,6 +272,7 @@ export default function App() {
         role={role}
         activePage={page}
         userName={userName}
+        userId={user?.id}
         onNavigate={setPage}
         onLogout={() => { signOut(); setDemoRole(null); setDemoName(''); setDispatcherIsNew(false); setPage('dashboard') }}
         dispatcherIsNew={role === 'dispatcher' && dispatcherIsNew}
@@ -284,7 +287,7 @@ export default function App() {
           onNotifClick={() => setPage('chat')}
         />
         <main className="page-content">
-          <PageContent role={role} page={page} userName={userName} onNavigate={setPage} dispatcherIsNew={dispatcherIsNew} />
+          <PageContent role={role} page={page} userName={userName} userId={user?.id ?? ''} onNavigate={setPage} dispatcherIsNew={dispatcherIsNew} />
         </main>
       </div>
     </div>
