@@ -103,18 +103,27 @@ export default function AuthPage({ onLogin }: Props) {
 
       // 2. Real Supabase sign-in
       setSubmitting(true)
-      const { error: err } = await signIn(email, password)
+      let err: Error | null = null
+      try {
+        const timeout = new Promise<{ error: Error }>(resolve =>
+          setTimeout(() => resolve({ error: new Error('Нет ответа от сервера (10 сек). Проверь что проект активен на supabase.com') }), 10000)
+        )
+        const result = await Promise.race([signIn(email, password), timeout])
+        err = result.error
+      } catch (e: unknown) {
+        err = e instanceof Error ? e : new Error(String(e))
+      }
       setSubmitting(false)
       if (err) {
         const msg = err.message || ''
         if (msg.toLowerCase().includes('email not confirmed') || msg.toLowerCase().includes('email_not_confirmed')) {
-          setError('Your email is not confirmed. Check your inbox and click the confirmation link, or ask the admin to disable email confirmation in Supabase.')
+          setError('Email не подтверждён. Проверь почту или отключи подтверждение в Supabase.')
         } else if (msg.toLowerCase().includes('invalid login credentials') || msg.toLowerCase().includes('invalid_credentials')) {
-          setError('Wrong email or password. Try again or use a demo account below.')
+          setError('Неверный email или пароль.')
         } else if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('fetch')) {
-          setError('Network error. Check your internet connection and try again.')
+          setError('Ошибка сети. Проверь интернет-соединение.')
         } else {
-          setError(msg || 'Sign in failed. Check your credentials.')
+          setError(msg || 'Ошибка входа. Проверь данные.')
         }
         return
       }
