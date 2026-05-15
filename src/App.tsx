@@ -199,7 +199,7 @@ function PageContent({ role, page, userName, onNavigate, dispatcherIsNew }: { ro
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const { profile, loading, signOut } = useAuth()
+  const { profile, user, loading, signOut } = useAuth()
   const [page, setPage] = useState('dashboard')
 
   // Demo fallback: when no Supabase session, store role locally
@@ -222,8 +222,9 @@ export default function App() {
     )
   }
 
-  // Not authenticated — use mock auth for demo OR real Supabase auth
-  if (!profile && !demoRole) {
+  // Not authenticated — show auth page only if no Supabase session AND no demo role
+  // If user has a Supabase session (user != null) but profile row is missing, still let them in
+  if (!profile && !demoRole && !user) {
     return (
       <AuthPage
         onLogin={(role: UserRole, name: string, isNew?: boolean) => {
@@ -236,8 +237,16 @@ export default function App() {
     )
   }
 
-  const role     = profile?.role     ?? demoRole!
-  const userName = profile?.full_name ?? demoName
+  // Determine role: from DB profile → demo selection → user metadata → default
+  const role: UserRole = profile?.role
+    ?? demoRole
+    ?? (user?.user_metadata?.role as UserRole | undefined)
+    ?? 'owner-op'
+  const userName = profile?.full_name
+    ?? demoName
+    ?? user?.user_metadata?.full_name
+    ?? user?.email?.split('@')[0]
+    ?? 'User'
 
   return (
     <div className="app-shell">
@@ -246,7 +255,7 @@ export default function App() {
         activePage={page}
         userName={userName}
         onNavigate={setPage}
-        onLogout={() => { signOut(); setDemoRole(null); setDemoName(''); setDispatcherIsNew(false) }}
+        onLogout={() => { signOut(); setDemoRole(null); setDemoName(''); setDispatcherIsNew(false); setPage('dashboard') }}
         dispatcherIsNew={role === 'dispatcher' && dispatcherIsNew}
       />
       <div className="main-area">
