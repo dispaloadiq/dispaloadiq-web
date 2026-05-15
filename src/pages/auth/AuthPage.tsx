@@ -250,8 +250,8 @@ export default function AuthPage({ onLogin }: Props) {
       }}>
         <div style={{ width: '100%', maxWidth: 420 }}>
 
-          {/* ── DEMO QUICK ACCESS ─────────────────────────────────────── */}
-          <div style={{ background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: 16, padding: '18px', marginBottom: 22 }}>
+          {/* ── DEMO QUICK ACCESS — only on creds step ────────────────── */}
+          {step === 'creds' && <div style={{ background: '#fff', border: '1.5px solid #E2E8F0', borderRadius: 16, padding: '18px', marginBottom: 22 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <div style={{ fontWeight: 800, fontSize: 13, color: '#1A2535' }}>⚡ Try a Demo — No Signup</div>
               <span style={{ fontSize: 10, background: '#EBF8FF', color: '#2C7A9A', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>INSTANT ACCESS</span>
@@ -284,14 +284,16 @@ export default function AuthPage({ onLogin }: Props) {
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
 
-          {/* Divider */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 22 }}>
-            <div style={{ flex: 1, height: 1, background: '#E2E8F0' }} />
-            <span style={{ fontSize: 11, color: '#A0AEC0', fontWeight: 600, whiteSpace: 'nowrap' }}>OR SIGN IN WITH EMAIL</span>
-            <div style={{ flex: 1, height: 1, background: '#E2E8F0' }} />
-          </div>
+          {/* Divider — only on creds step */}
+          {step === 'creds' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 22 }}>
+              <div style={{ flex: 1, height: 1, background: '#E2E8F0' }} />
+              <span style={{ fontSize: 11, color: '#A0AEC0', fontWeight: 600, whiteSpace: 'nowrap' }}>OR SIGN IN WITH EMAIL</span>
+              <div style={{ flex: 1, height: 1, background: '#E2E8F0' }} />
+            </div>
+          )}
 
           {/* ── CREDENTIALS STEP ──────────────────────────────────────── */}
           {step === 'creds' ? (
